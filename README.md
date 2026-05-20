@@ -1,154 +1,170 @@
-# __NVIDIA_OSS__ Standard Repo Template
+# NuRec Skills
 
-This README file is from the NVIDIA_OSS standard repo template of [PLC-OSS-Template](https://github.com/NVIDIA-GitHub-Management/PLC-OSS-Template?tab=readme-ov-file). It provides a list of files in the PLC-OSS-Template and guidelines on how to use (clone and customize) them.
+Agent skills for **NVIDIA Omniverse NuRec** and the surrounding
+neural-reconstruction stack — installable, version-pinned `SKILL.md`
+bundles that teach a coding agent how to ingest sensor data, train
+reconstructions, render novel views, harvest 3D objects, clean up
+artifacts, and find the right NVIDIA dataset for the job.
 
-**Upon completing the customization for the project repo, the repo admin should replace this README template with the project specific README file.**
+The canonical home is <https://github.com/NVIDIA/nurec-skills>.
 
-- Files (org-wide templates in the NVIDIA .github org repo; per-repo overrides allowed) in [PLC-OSS-Template](https://github.com/NVIDIA-GitHub-Management/PLC-OSS-Template?tab=readme-ov-file)
+## What's a skill?
 
-   - Root 
-     - README.md skeleton (CTA + Quickstart + Support/Security/Governance links) 
-     - LICENSE (Apache 2.0 by default)
-        - For other licenses, see the [Confluence page](https://confluence.nvidia.com/pages/viewpage.action?pageId=788418816) for other licenses
-        - CLA.md file (delete if not using MIT or BSD licenses)
-     - CODE_OF_CONDUCT.md 
-     - SECURITY.md (vuln reporting path) 
-     - CONTRIBUTING.md (base; repo can add specifics)
-     - SUPPORT.md (Support levels/channels)
-     - GOVERNANCE.md (baseline; repo may extend)
-     - CITATION.md (for projects that need citation)
+A **skill** is a single Markdown file (plus a few companion files)
+that an agent reads on demand to gain task-specific knowledge. Each
+skill in this repo follows the [agentskills.io](https://agentskills.io)
+convention: a YAML frontmatter block (name, description, trigger
+keywords, compatibility, upstream pointer) followed by a hand-curated
+recipe. Agents that support the standard — Cursor, Claude Code, Codex,
+and others — can resolve a skill by **name**, regardless of where the
+file is on disk.
 
-   - .github/ 
-     - ISSUE_TEMPLATE/ (<https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository>)
-       - bug.yml, feature.yml, task.yml, config.yml 
-     - PULL_REQUEST_TEMPLATE.md (<https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/creating-a-pull-request-template-for-your-repository>)
-     - workflows/
-     - Note: workflow-templates/ for starter workflows should live in the org-level .github repo, not per-repo
+These skills are **thin coordination layers**. They don't redistribute
+NVIDIA source; instead, they teach an agent how to drive the public
+NGC containers, GitHub repos, and HuggingFace artifacts that make up
+the NuRec stack.
 
-   - Repo-specific (not org-template, maintained by the team)
-     - CODEOWNERS (place at .github/CODEOWNERS or repo root)
-     - CHANGELOG.md (or RELEASE.md) 
-     - ROADMAP.md 
-     - MAINTAINERS.md 
-     - NOTICE or THIRD_PARTY_NOTICES / THIRD_PARTY_LICENSES (dependency specific)
-     - Build/package files (CMake, pyproject, Dockerfile, etc.)
+## Skills in this repo
 
-   - Recommended structure and hygiene
-     - docs/
-     - examples/
-     - tests/
-     - scripts/
-     - Container/dev env: Dockerfile, docker/, .devcontainer/ (optional)
-     - Build/package (language-specific):
-       - Python: pyproject.toml, setup.cfg/setup.py, requirements.txt, environment.yml
-       - C++: CMakeLists.txt, cmake/, vcpkg.json
-     - Repo hygiene: .gitignore, .gitattributes, .editorconfig, .pre-commit-config.yaml, .clang-format
+Start with [`nurec-index`](./.agents/skills/SKILL.md) — it routes any
+NuRec task to the right sibling skill below.
 
+| Name | Folder | Pinned version | Purpose |
+|------|--------|----------------|---------|
+| [`nurec-index`](./.agents/skills/SKILL.md) | `.agents/skills/` | hand-curated | Router. Read first. Picks the right skill for any NuRec task. |
+| [`physical-ai-datasets`](./.agents/skills/physical-ai-datasets/SKILL.md) | `.agents/skills/physical-ai-datasets/` | hand-curated | Catalog of every NVIDIA `PhysicalAI-*` dataset on Hugging Face — AV, robotics, NuRec scenes, benchmarks. |
+| [`ncore-data-conversion`](./.agents/skills/ncore/SKILL.md) | `.agents/skills/ncore/` | upstream `2026.04` | Convert any sensor recording (cameras, LiDAR, radar, IMU, depth, stereo) into [NCore V4](https://github.com/NVIDIA/ncore) — the format NRE consumes. Includes a converter template. |
+| [`nre`](./.agents/skills/nre/SKILL.md) | `.agents/skills/nre/_versions/release_26.04/85ba2e2/` | NRE `release_26.04` | Train 3DGUT/3DGRT Gaussian reconstructions, render novel views (local or via gRPC), export PLY/mesh/depth, edit actors, evaluate quality. Drives the public `nvcr.io/nvidia/nre/{nre,nre-tools}` containers. |
+| [`asset-harvester`](./.agents/skills/asset-harvester/SKILL.md) | `.agents/skills/asset-harvester/_versions/main/e08b1b2/` | upstream `main` @ `e08b1b2` | Extract per-object 3D Gaussian Splat assets from sparse AV-clip views via SparseViewDiT + TokenGS. Open-source ([NVIDIA/asset-harvester](https://github.com/NVIDIA/asset-harvester), Apache-2.0). |
+| [`nurec-fixer`](./.agents/skills/nurec-fixer/SKILL.md) | `.agents/skills/nurec-fixer/_versions/main/617a990/` | upstream `main` @ `617a990` | Post-process novel-view renders with the NVIDIA Fixer (Difix3D+) diffusion model — removes ghosting, floaters, and temporal flicker. |
 
-## Usage of [PLC-OSS-Template](https://github.com/NVIDIA-GitHub-Management/PLC-OSS-Template?tab=readme-ov-file) for NEW NVIDIA OSS repos
+## Repo layout
 
-1. Clone the [PLC-OSS-Template](https://github.com/NVIDIA-GitHub-Management/PLC-OSS-Template?tab=readme-ov-file)
-2. Find/replace all in the clone of `___PROJECT___` and `__PROJECT_NAME__` with the name of the specific project.
-3. Inspect all files to make sure all replacements work and update text as needed
-
-
-**What you can reuse immediately**
-- CODE_OF_CONDUCT.md
-- SECURITY.md
-- CONTRIBUTING.md (base)
-- .github/ISSUE_TEMPLATE/.yml (bug/feature/task + config.yml)
-- .github/PULL_REQUEST_TEMPLATE.md
-- Reusable workflows 
-
-**What you must customize per repo**
-- README.md: copy the skeleton and fill in product-specific details (Quickstart, Requirements, Usage, Support level, links)
-- LICENSE: check file is correct, update year, consult Confluence for alternatives https://confluence.nvidia.com/pages/viewpage.action?pageId=788418816, add CLA.md only if your license/process requires it
-- CODEOWNERS: replace <TEAM> with your GitHub team handle(s). Place at .github/CODEOWNERS (or repo root)
-- MAINTAINERS.md: list maintainers names/roles, escalation path
-- CHANGELOG.md (or RELEASE.md): track releases/changes
-- SUPPORT.md: Update for your project
-- ROADMAP.md (optional): upcoming milestones
-- NOTICE / THIRD_PARTY_NOTICES (if you ship third‑party content)
-- Build/package files (CMake/pyproject/Dockerfile/etc.), tests/, docs/, examples/, scripts/ as appropriate
-- Workflows: Edit if you need custom behavior 
-
-
-4. Change git origin to point to new repo and push
-5. Remove the line break below and everything above it
-
-## Usage for existing NVIDIA OSS repos
-
-1. Follow the steps above, but add the files to your existing repo and merge
-
-<!-- REMOVE THE LINE BELOW AND EVERYTHING ABOVE -->
------------------------------------------
-# [Project Title]
-One-sentence value proposition for users. Who is it for, and why it matters. 
-
-# Overview
-What the project does? Why the project is useful?
-Provide a brief overview, highlighting key features or problem-solving capabilities.
-
-# Getting Started
-Guide users on how they can get started with the project. This should include basic installation step, quick-start examples 
-```bash
-# Option A: Package manager (pip/conda/npm/etc.)
-<copy-paste install>
-
-# Option B: Container
-docker run <image> <args>
-
-# Verify (hello world)
-<one-liner or ~10-line example>
+```text
+.agents/
+└── skills/
+    ├── SKILL.md                      # The nurec-index router
+    ├── physical-ai-datasets/
+    │   └── SKILL.md
+    ├── ncore/
+    │   ├── SKILL.md
+    │   └── ncore_template/           # Converter scaffold for new sensor formats
+    ├── nre/
+    │   ├── SKILL.md            ──►  _versions/release_26.04/85ba2e2/SKILL.md
+    │   ├── references/         ──►  _versions/release_26.04/85ba2e2/references/
+    │   ├── scripts/            ──►  _versions/release_26.04/85ba2e2/scripts/
+    │   └── _versions/release_26.04/85ba2e2/
+    │       ├── SKILL.md
+    │       ├── references/
+    │       └── scripts/
+    ├── asset-harvester/
+    │   └── _versions/main/e08b1b2/   # Same shape; symlinks at the parent
+    └── nurec-fixer/
+        └── _versions/main/617a990/   # Same shape; symlinks at the parent
 ```
-# Requirements
-Include a list of pre-requisites. 
-- OS/Arch: <summary or link to full matrix>
-- Runtime/Compiler: <versions>
-- GPU/Drivers (if applicable): CUDA <ver>, driver <ver>, etc.
 
-# Usage
+Skills that wrap a specific upstream commit pin that commit under
+`<skill>/_versions/<branch>/<commit>/`. Symlinks at the skill root
+(`<skill>/SKILL.md`, `references/`, `scripts/`, `tests.yaml`) point at
+the currently-selected version, so cross-skill markdown links like
+`../nre/SKILL.md` keep resolving when an agent navigates the symlinked
+paths.
+
+## Using these skills
+
+Most modern agent runtimes already auto-discover skills under
+`.agents/skills/`, `.claude/skills/`, `.cursor/skills/`, or
+`~/.cursor/skills/`. The two common ways to consume this repo:
+
+### 1. Drop the repo next to your project
+
+Clone into your project (or a parent directory the agent indexes):
+
 ```bash
-# Minimal runnable snippet (≤20 lines)
-<code>
+git clone https://github.com/NVIDIA/nurec-skills.git
 ```
-- More examples/tutorials: <link>
-- API reference: <link>
 
-# Performance (Optional)
-Summary of benchmarks; link to detailed results and hardware used.
+Then ask your agent to do anything in the trigger surface — e.g. "use
+NuRec to render this clip", "convert my ROS 2 bag to NCore", "harvest
+3D assets from this driving log". The agent picks the right skill via
+`nurec-index` and follows the recipe.
 
-## Releases & Roadmap 
-- Releases/Changelog: <link>
-- (Optional) Next milestones or link to `ROADMAP.md`.
-  
-# Contribution Guidelines
-- Start here: `CONTRIBUTING.md`
-- Code of Conduct: `CODE_OF_CONDUCT.md`
-- Development quickstart (build/test):
+### 2. Install a skill into your user-space
+
+Symlink (or copy) one or more skills into your runtime's user-space
+skills directory. For Cursor:
+
 ```bash
-<clone> && <deps> && <build/test>
+mkdir -p ~/.cursor/skills
+ln -s "$(pwd)/.agents/skills/nre"               ~/.cursor/skills/nre
+ln -s "$(pwd)/.agents/skills/ncore"             ~/.cursor/skills/ncore-data-conversion
+ln -s "$(pwd)/.agents/skills/asset-harvester"   ~/.cursor/skills/asset-harvester
+ln -s "$(pwd)/.agents/skills/nurec-fixer"       ~/.cursor/skills/nurec-fixer
+ln -s "$(pwd)/.agents/skills/physical-ai-datasets" ~/.cursor/skills/physical-ai-datasets
+ln -s "$(pwd)/.agents/skills/SKILL.md"          ~/.cursor/skills/nurec-index
 ```
-## Governance & Maintainers
-- Governance: `GOVERNANCE.md`
-- Maintainers: <team/handles>
-- Labeling/triage policy: <link>
 
-## Security
-- Vulnerability disclosure: `SECURITY.md`
-- Do not file public issues for security reports.
+Adjust the destination directory (`~/.claude/skills`, etc.) for other
+runtimes.
 
-## Support
-- Level: <Experimental | Maintained | Stable>
-- How to get help: Issues/Discussions/<channel link>
-- Response expectations (if any).
+## Prerequisites
 
-# Community
-Provide the channel for community communications.
+These skills drive external NVIDIA infrastructure. Each skill lists
+its own prerequisites in detail; the headline ones:
 
-# References
-Provide a list of related references
+- **OS / arch:** Linux x86_64 with NVIDIA drivers (CUDA 12.x). aarch64
+  is not supported by the NRE containers.
+- **GPU:** Ampere or newer (compute capability ≥ 8.0). 16 GB VRAM is
+  the practical floor for the Fixer; 24–48 GB+ is recommended for NRE
+  training.
+- **Containers:** Docker 23+ and the NVIDIA Container Toolkit are
+  required for `nre`, `nre-tools`, and `nurec-fixer`. NGC API key is
+  required to pull `nvcr.io/nvidia/nre/*`.
+- **Hugging Face:** an `HF_TOKEN` is required for any gated dataset
+  (`nvidia/PhysicalAI-Autonomous-Vehicles*`, `nvidia/Fixer`,
+  `nvidia/asset-harvester`, …).
+- **Python / conda:** required for the Asset Harvester install path
+  and for the NCore in-process API (`pip install nvidia-ncore`).
 
-# License
-This project is licensed under the [NAME HERE] License - see the LICENSE.md file for details
-- License: <link>
+## Upstream sources of truth
+
+Each skill is thin; the canonical artifacts live upstream:
+
+- **NCore** — <https://github.com/NVIDIA/ncore>
+  (spec: <https://nvidia.github.io/ncore/data/conventions.html>)
+- **NRE / NuRec containers** — `nvcr.io/nvidia/nre/nre`,
+  `nvcr.io/nvidia/nre/nre-tools` (NGC); product page
+  <https://www.nvidia.com/en-us/omniverse/nurec/>
+- **Asset Harvester** — <https://github.com/NVIDIA/asset-harvester>
+  (paper: <https://arxiv.org/abs/2604.18468>; demo:
+  <https://huggingface.co/spaces/nvidia/asset-harvester>)
+- **Fixer (Difix3D+)** — <https://huggingface.co/nvidia/Fixer>
+  (open-source code: <https://github.com/nv-tlabs/Difix3D>; paper:
+  <https://arxiv.org/abs/2503.01774>)
+- **Physical AI datasets** — <https://huggingface.co/nvidia> (filter
+  `PhysicalAI-`); curated collection
+  <https://huggingface.co/collections/nvidia/physical-ai>
+
+When upstream releases shift, bump the pinned `_versions/<branch>/<commit>/`
+folder and update the symlinks at the skill root.
+
+## Contributing
+
+- Frontmatter follows the [agentskills.io](https://agentskills.io)
+  schema (`name`, `description`, `version`, `license`, `metadata`).
+  Trigger keywords belong inside `description:` so the runtime indexes
+  them.
+- New skills go under `.agents/skills/<folder>/`. Use the
+  `_versions/<branch>/<commit>/` layout when the skill wraps a
+  specific upstream commit; otherwise keep the SKILL flat (like
+  `physical-ai-datasets`).
+- After adding or renaming a skill, update the [`nurec-index`](./.agents/skills/SKILL.md)
+  router so it knows how to route to it.
+
+## License
+
+Each skill carries its own license in its frontmatter (`license:`).
+The repo as a whole is published by NVIDIA under the licenses noted on
+each individual skill — most are `Apache-2.0` (skills wrapping
+open-source upstreams) or `LicenseRef-NVIDIA` (the `nre` skill, which
+drives NVIDIA's proprietary NGC containers).
