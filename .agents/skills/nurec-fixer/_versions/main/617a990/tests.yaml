@@ -74,7 +74,7 @@ items:
   - --gpus
   - pretrained_fixer.pkl
   - inference_pretrained_model.py
-  - nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
+  - $(id -u):$(id -g)
   expected_signals_any:
   - --timestep 250
   - --timestep=250
@@ -83,11 +83,16 @@ items:
   - gitlab-master.nvidia.com
   - torchrun
   - --nproc_per_node
+  - nv-tlabs/Difix3D
   judge_rubric:
   - The command mounts the weights directory (read-only is acceptable) and points --model at the in-container
     path.
   - The command mounts both input and output directories into the container.
   - The command does not use torchrun or multi-process launch for Fixer inference.
+  - The command threads `-u $(id -u):$(id -g)` (or an equivalent `--user` flag) so output files are owned
+    by the host user rather than root.
+  - The response references the V2 code path (nv-tlabs/Fixer or a custom image built from Dockerfile.cosmos)
+    rather than the V1 nv-tlabs/Difix3D repository.
 - id: nurec-fixer.004
   category: single-tool
   tools_required:
@@ -235,6 +240,64 @@ items:
     (Cosmos-Guardrail1).
   - The response explains that a single HF_TOKEN with Read scope serves both, as long as the relevant
     model licenses are accepted.
+- id: nurec-fixer.010
+  category: single-tool
+  tools_required:
+  - nurec-fixer
+  user_prompt: 'I finished running NVIDIA Fixer end-to-end on my host. Walk me through
+
+    what cleanup I should do — what images, weights, code clones, and
+
+    output directories did the workflow leave behind, and how do I
+
+    reclaim disk?
+
+    '
+  timeout_seconds: 120
+  expected_signals:
+  - docker image
+  - cosmos-predict2-container
+  - nurec-fixer
+  expected_signals_any:
+  - 127 GB
+  - 120 GB
+  - ~120
+  - docker image prune
+  forbidden_signals:
+  - gitlab-master.nvidia.com
+  judge_rubric:
+  - The response calls out the cosmos-predict2 base image and the layered Fixer image (built from Dockerfile.cosmos)
+    as the largest disk consumers.
+  - The response covers HuggingFace weight cleanup (`./models` and the HF hub cache) and the V2 source
+    clone.
+  - The response addresses root-owned outputs (sudo chown) for outputs created before -u was added.
+- id: nurec-fixer.011
+  category: single-tool
+  tools_required:
+  - nurec-fixer
+  user_prompt: 'How should I check that HF_TOKEN is set on my host before running Fixer?
+
+    Give me a safe bash one-liner.
+
+    '
+  timeout_seconds: 60
+  expected_signals:
+  - validate_setup.py
+  expected_signals_any:
+  - '${#HF_TOKEN}'
+  - test -n
+  - presence
+  forbidden_signals:
+  - gitlab-master.nvidia.com
+  - ${HF_TOKEN:-no}
+  - ${HF_TOKEN:+yes}${HF_TOKEN
+  judge_rubric:
+  - The response recommends scripts/validate_setup.py for prerequisite checks rather than ad-hoc bash that
+    substitutes the secret value.
+  - If a bash one-liner is offered, it uses presence/length checks (test -n, ${#HF_TOKEN}) and never echoes
+    the token value.
+  - The response does not propose the broken ${VAR:+yes}${VAR:-no} pattern, which echoes the token whenever
+    VAR is set.
 generated_at: '2026-05-09T00:42:01Z'
 generated_with:
   provider: openai-compatible

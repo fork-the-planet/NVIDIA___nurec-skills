@@ -1,27 +1,34 @@
 ---
 name: physical-ai-datasets
 description: >-
-  Use when the user wants to find, download, or pick a NVIDIA Physical AI
-  dataset on Hugging Face for autonomous-vehicle, robotics, spatial
-  intelligence, manipulation, or neural-reconstruction workflows. Catalog
-  of every dataset under https://huggingface.co/nvidia with the
-  `PhysicalAI-` prefix,
-  organised by domain (Autonomous Vehicles, Robotics-Manipulation,
-  Robotics-GR00T, Robotics-mindmap, Robotics-NuRec, Spatial Intelligence,
-  Grasping, Healthcare, Sim-Ready scenes, Material properties), with
-  per-dataset size, format, gating, license, and the downstream
-  in-repo sibling skill (`ncore-data-conversion`, `nre`,
-  `asset-harvester`, `nurec-fixer`) or upstream tool (Isaac Sim,
-  CARLA, Isaac-GR00T, Cosmos-*) that consumes it. Trigger keywords: nvidia
-  physical ai dataset, PhysicalAI- dataset, hf nvidia dataset, NCore
-  dataset, NuRec dataset, GR00T dataset, mindmap dataset, GraspGen,
-  SimReady warehouse, SmartSpaces, MTMC tracking, AI City Challenge,
-  Cosmos-Drive-Dreams data, Lyra SDG, Open-H-Embodiment, surgical
-  robotics dataset, VoMP, DigitalCousin Assets, hf auth login,
-  huggingface-cli download, NVIDIA Autonomous Vehicle Dataset License,
-  physical_ai_av toolkit, dataset gated, accept license, RDS-HQ.
+  Use when the user wants to find, download, or pick a NVIDIA Physical
+  AI dataset on Hugging Face for autonomous-vehicle, robotics, spatial
+  intelligence, manipulation, or neural-reconstruction workflows.
+  Catalog of every dataset under https://huggingface.co/nvidia with
+  the `PhysicalAI-` prefix, organised by domain (Autonomous Vehicles,
+  Robotics-Manipulation, Robotics-GR00T, Robotics-mindmap,
+  Robotics-NuRec, Spatial Intelligence, Grasping, Healthcare,
+  Sim-Ready scenes, Material properties), with per-dataset size,
+  format, gating, license, and the downstream sibling skill
+  (`ncore-data-conversion`, `nre`, `asset-harvester`, `nurec-fixer`)
+  or upstream tool (Isaac Sim, CARLA, Isaac-GR00T, Cosmos-*) that
+  consumes it. Trigger keywords: nvidia physical ai dataset,
+  PhysicalAI- dataset, hf nvidia dataset, NCore dataset, NuRec
+  dataset, GR00T dataset, mindmap dataset, GraspGen, SimReady,
+  SmartSpaces, Cosmos-Drive-Dreams, Lyra SDG, Open-H-Embodiment,
+  huggingface-cli download, physical_ai_av, dataset gated, RDS-HQ.
 version: "0.1.0"
 author: NVIDIA Physical AI
+tags:
+  - dataset-catalog
+  - physical-ai
+  - huggingface
+  - autonomous-vehicles
+  - robotics
+tools:
+  - Shell
+  - Read
+  - Write
 license: Apache-2.0
 dependencies:
   - bash
@@ -32,8 +39,7 @@ compatibility: >-
   `huggingface_hub` (CLI: `huggingface-cli` / new `hf` shim) plus a HF
   user access token. Several datasets are GATED — they need explicit
   license acceptance on the HF dataset page before any token can pull
-  them. Storage requirements range from <1 GB (GR00T-Eval, GR00T-GR1,
-  Teleop-G1) to >100 TB (PhysicalAI-Autonomous-Vehicles, 133 TB).
+  them. Storage ranges from <1 GB to >100 TB (PhysicalAI-Autonomous-Vehicles, 133 TB).
 metadata:
   hf_org: https://huggingface.co/nvidia
   hf_collection: https://huggingface.co/collections/nvidia/physical-ai
@@ -52,6 +58,41 @@ downstream skill in this repo that consumes it.
 > and the curated [Physical AI collection](https://huggingface.co/collections/nvidia/physical-ai).
 > When upstream cards drift, re-check the HF page; this skill mirrors
 > the cards as of Apr 2026.
+
+## Prerequisites
+
+- HuggingFace account with the **dataset card opened in a browser at
+  least once**, and the gating checkbox accepted on every dataset you
+  intend to download.
+- HuggingFace user access token exported as `HF_TOKEN` (create at
+  <https://huggingface.co/settings/tokens>).
+- `git`, `git-lfs`, and `huggingface_hub[cli]` on PATH.
+- Storage room sized to the dataset you're pulling (see the per-row
+  size column; some are < 1 GB, the AV dataset is 133 TB — always
+  pre-filter with `--include` or `physical_ai_av`).
+
+### Verifying secrets safely
+
+**Always check token presence with `hf auth whoami` or a length-only
+shell test; never write ad-hoc bash that interpolates `HF_TOKEN`
+values.** The common one-liner
+
+```bash
+# BAD — leaks the secret to the terminal when the variable is set
+echo "HF_TOKEN: ${HF_TOKEN:+yes}${HF_TOKEN:-no}"
+```
+
+prints `yes<token-value>` whenever `HF_TOKEN` is set, because
+`${VAR:-no}` only falls back to "no" when `VAR` is empty — when set
+it expands to `$VAR`. Use one of these instead:
+
+```bash
+hf auth whoami                              # confirms the token without echoing it
+test -n "$HF_TOKEN" && echo "HF_TOKEN: set (${#HF_TOKEN} chars)" || echo "HF_TOKEN: missing"
+```
+
+Rotate any token you suspect was echoed at
+<https://huggingface.co/settings/tokens>.
 
 ## Table of Contents
 

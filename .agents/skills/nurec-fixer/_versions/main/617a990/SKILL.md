@@ -2,25 +2,22 @@
 name: nurec-fixer
 description: >-
   Use when a user wants to enhance, harmonize, or temporally stabilize
-  novel-view renders produced by a 3D reconstruction / neural renderer
-  (especially NRE / NuRec outputs) by running NVIDIA Fixer — a
-  single-step diffusion model (based on Difix3D+) that removes
-  artifacts caused by underconstrained regions of the 3D representation.
-  Covers fetching pretrained weights from HuggingFace nvidia/Fixer,
-  preparing the cosmos-predict2 container environment, running
-  per-sequence inference on a directory of rendered frames, and
-  evaluating results with PSNR / LPIPS on paired render↔ground-truth
-  test sets. Use only for post-processing rendered images from an
-  external 3D reconstruction pipeline — not for generating or training
-  the reconstruction itself. Trigger keywords: nurec fixer, nvidia
-  fixer, unified fixer, harmonizer, difix, difix3d, difix3d+,
-  pretrained_fixer.pkl, nvidia/Fixer, fix rendered frames, harmonize
-  rendered frames, remove reconstruction artifacts, temporal
-  stabilization, post-process novel views, cosmos fixer,
-  cosmos-predict2-container, inference_pretrained_model.py,
-  evaluate_test_dataset.py, novel view enhancement, 3D reconstruction
-  refinement, NRE difix cache, --enable-difix.
-version: "0.1.0"
+  novel-view renders from a 3D reconstruction (especially NRE / NuRec
+  outputs) by running NVIDIA Fixer V2 — a single-step diffusion model
+  (Difix3D+ lineage) that removes artifacts in underconstrained regions
+  of the 3D representation. Covers fetching the V2 weights from
+  HuggingFace nvidia/Fixer, building the inference image via
+  Dockerfile.cosmos from nv-tlabs/Fixer on top of cosmos-predict2,
+  running per-sequence inference on a folder of rendered frames, and
+  evaluating PSNR / LPIPS on paired render↔ground-truth sets.
+  Post-processing only — not for training the reconstruction. Trigger
+  keywords: nurec fixer, nvidia fixer V2, harmonizer, difix, difix3d+,
+  pretrained_fixer.pkl, nvidia/Fixer, nv-tlabs/Fixer, Dockerfile.cosmos,
+  fix rendered frames, remove reconstruction artifacts, temporal
+  stabilization, cosmos fixer, cosmos-predict2-container,
+  inference_pretrained_model.py, evaluate_test_dataset.py,
+  --enable-difix.
+version: "0.2.0"
 author: NVIDIA NuRec
 tags:
   - nurec
@@ -36,40 +33,55 @@ license: Apache-2.0 OR CC-BY-4.0
 compatibility: >-
   Linux host with an NVIDIA GPU of Ampere architecture or newer
   (compute capability >= 8.0; A100, A10, L40, H100, RTX 30/40/PRO,
-  B200, GB200). Requires recent NVIDIA driver compatible with CUDA 12,
-  NVIDIA Container Toolkit, Docker (or Podman). ~16 GB VRAM
-  recommended for the pretrained Fixer at 1024x576. Internet egress
-  required to pull the cosmos-predict2 container from nvcr.io and
-  pretrained weights from huggingface.co. Credentials via env vars
-  only: HF_TOKEN (HuggingFace, required for weight download),
-  NGC_API_KEY (optional, only if your NGC account gates the
-  container). Scripts make network calls to huggingface.co and
-  nvcr.io.
+  B200, GB200). Recent NVIDIA driver supporting CUDA 12, NVIDIA
+  Container Toolkit, Docker (or Podman). ~16 GB VRAM at 1024x576.
+  Internet egress to nvcr.io, github.com, huggingface.co. Credentials
+  via env vars only: HF_TOKEN (required), NGC_API_KEY (optional).
 dependencies:
   - bash
   - docker
+  - git
   - nvidia-container-toolkit
   - python3
 metadata:
-  upstream: https://github.com/nv-tlabs/Difix3D
+  upstream: https://github.com/nv-tlabs/Fixer
+  upstream_ancestry: https://github.com/nv-tlabs/Difix3D
   hf_models: https://huggingface.co/nvidia/Fixer
+  model_version: "v2"
   ngc_container: nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
   paper: https://arxiv.org/abs/2503.01774
   product_page: https://research.nvidia.com/labs/toronto-ai/difix3d/
 ---
 
-# NVIDIA Fixer (NuRec Post-Processing)
+# NVIDIA Fixer V2 (NuRec Post-Processing)
 
 Single-step image diffusion model that removes artifacts from novel-view
 renders produced by 3D reconstruction pipelines (Gaussian Splatting,
-NeRF, NRE / NuRec, and similar). Based on Difix3D+
-(see [paper](https://arxiv.org/abs/2503.01774) and the open-source
-[Difix3D+ repository](https://github.com/nv-tlabs/Difix3D)). The
-pretrained Fixer checkpoint is published on HuggingFace at
-[`nvidia/Fixer`](https://huggingface.co/nvidia/Fixer) and runs inside
-the public
-[`nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2`](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/cosmos/containers/cosmos-predict2-container)
-container.
+NeRF, NRE / NuRec, and similar). Fixer V2 is the successor to Difix3D+
+(see [paper](https://arxiv.org/abs/2503.01774) for the V1 method); the
+V2 inference code lives at
+[`nv-tlabs/Fixer`](https://github.com/nv-tlabs/Fixer), and the V2
+pretrained checkpoint (`pretrained_fixer.pkl`, the file inspected by
+`torch.load(...).keys()` here) is published on HuggingFace at
+[`nvidia/Fixer`](https://huggingface.co/nvidia/Fixer). Inference runs
+inside a custom image built from `Dockerfile.cosmos` shipped in the V2
+repo on top of
+[`nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2`](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/cosmos/containers/cosmos-predict2-container).
+
+> **Version alignment matters.** The legacy `nv-tlabs/Difix3D` repository
+> is V1 code and pairs with V1 checkpoints. The `nvidia/Fixer`
+> HuggingFace weights are V2 and will hit a `state_dict` mismatch if
+> loaded against V1 model definitions. Use the V2 code path on this page
+> end-to-end; treat `Difix3D` purely as the academic ancestor.
+
+## Table of Contents
+
+- [When to Use](#when-to-use) · [Inputs](#inputs) · [Instructions](#instructions) · [Output Format](#output-format)
+- [Prerequisites](#prerequisites) · [Verifying secrets safely](#verifying-secrets-safely)
+- [Container setup](#container-setup) — [Pull base](#pull-the-cosmos-predict2-base-image) · [Build V2 image](#build-the-v2-inference-image) · [File ownership](#file-ownership-must-pin--u-id--u-id--g)
+- [Weight download](#weight-download) · [Run inference](#run-inference) · [Evaluate](#evaluate-a-paired-test-dataset)
+- [Consuming Fixer via NRE](#consuming-fixer-via-nre---enable-difix) · [Scripts](#scripts) · [References](#references)
+- [Limitations](#limitations) · [Troubleshooting](#troubleshooting) · [Teardown](#teardown)
 
 Fixer is typically chained **after** a NuRec / NRE reconstruction
 pipeline: the reconstruction renders novel views from held-out camera
@@ -134,31 +146,44 @@ quality, temporal coherence, and downstream metrics (PSNR, LPIPS).
 1. Run [`scripts/validate_setup.py`](scripts/validate_setup.py) to
    confirm the host has Docker, the NVIDIA Container Toolkit, a GPU
    with compute capability ≥ 8.0, `HF_TOKEN` exported, and enough
-   free disk for the container (~40 GB) plus weights (~6 GB). Abort
-   on any failure.
-2. Pull the container `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2`
-   if it is not already present (see
-   [Container setup](#container-setup)).
-3. Download the pretrained Fixer weights from
+   free disk for the container (~120 GB after `Dockerfile.cosmos`
+   build) plus weights (~5 GB). Abort on any failure. **Never** verify
+   `HF_TOKEN` / `NGC_API_KEY` are set by writing ad-hoc bash that
+   substitutes the value (see
+   [Verifying secrets safely](#verifying-secrets-safely)).
+2. Pull the cosmos-predict2 base image
+   `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2` if it is not
+   already present (see [Container setup](#container-setup)).
+3. Clone the V2 Fixer code from
+   [`nv-tlabs/Fixer`](https://github.com/nv-tlabs/Fixer) and build the
+   inference image with `docker build -f Dockerfile.cosmos .`. See
+   [Build the V2 inference image](#build-the-v2-inference-image).
+4. Download the V2 pretrained Fixer weights from
    [`nvidia/Fixer`](https://huggingface.co/nvidia/Fixer) into a host
    directory (typically `./models/`) using the HuggingFace CLI. See
    [Weight download](#weight-download).
-4. Confirm `input_dir` exists, contains supported images, that
+5. Confirm `input_dir` exists, contains supported images, that
    filenames natural-sort into the intended order, and that
    `output_dir` is empty or non-existent. Fail fast otherwise.
-5. Run the inference container with `input_dir`, `output_dir`, and
-   the weights directory mounted. See
-   [Run inference](#run-inference).
-6. Validate that the number of output images equals the number of
-   input images and spot-check a frame visually.
-7. **If evaluating:** prepare a paired test dataset per
+6. Run the inference container with `input_dir`, `output_dir`, and
+   the weights directory mounted, and **pin the container UID/GID to
+   the host user with `-u $(id -u):$(id -g)`** so outputs are owned by
+   you, not by root (see [Run inference](#run-inference) and
+   [File ownership](#file-ownership-must-pin--u-id--u-id--g)).
+7. Validate that the number of output images equals the number of
+   input images, spot-check a frame visually, and confirm
+   `ls -l <output_dir>` shows your UID rather than `root`.
+8. **If evaluating:** prepare a paired test dataset per
    [`references/test-dataset-layout.md`](references/test-dataset-layout.md)
    and run `evaluate_test_dataset.py` inside the container to produce
    `metrics.yaml` with PSNR and LPIPS.
-8. When consuming Fixer as part of an NRE pipeline, prefer passing
+9. When consuming Fixer as part of an NRE pipeline, prefer passing
    `--enable-difix --difix-cache=<path>` to the NRE entrypoint
    instead of running Fixer manually — NRE will download the same
    weights into the cache directory and call the model internally.
+10. When done, follow [Teardown](#teardown) to reclaim ~127 GB of
+    images, weights, code clones, and root-owned outputs the workflow
+    leaves behind.
 
 ## Output Format
 
@@ -200,31 +225,96 @@ per_scene:
 - Docker (or Podman) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 - NVIDIA GPU with compute capability ≥ 8.0 (Ampere or newer).
   ~16 GB VRAM recommended.
-- Internet egress to `nvcr.io` and `huggingface.co`.
+- `git` on PATH (V2 code lives in a GitHub clone).
+- Internet egress to `nvcr.io`, `github.com`, and `huggingface.co`.
 - HuggingFace account and access token exported as `HF_TOKEN`.
   Create at https://huggingface.co/settings/tokens. No license
   acceptance is currently gated on the `nvidia/Fixer` model page,
   but confirm the card terms before use.
-- ~40 GB free disk for the container image and ~6 GB for weights.
+- ~120 GB free disk: ~5 GB cosmos-predict2 base image,
+  ~120 GB after the `Dockerfile.cosmos` build adds the Fixer stack,
+  ~5 GB for the V2 HuggingFace weights, plus output room.
+
+### Verifying secrets safely
+
+**Always validate prerequisites by running
+[`scripts/validate_setup.py`](scripts/validate_setup.py).** Never write
+ad-hoc bash that interpolates `HF_TOKEN` / `NGC_API_KEY` values into
+stdout. In particular, the common one-liner
+
+```bash
+# BAD — leaks the secret to the terminal when the variable is set
+echo "HF_TOKEN: ${HF_TOKEN:+yes}${HF_TOKEN:-no}"
+```
+
+prints `yes<token-value>` whenever `HF_TOKEN` is set, because
+`${VAR:-no}` falls back to "no" only when `VAR` is empty — when set, it
+expands to `$VAR`. The validator uses presence-only checks
+(`os.environ.get("HF_TOKEN") is not None`) that never echo the value.
+If you must check in a shell, use a length check instead:
+
+```bash
+# OK — prints "set (N chars)" or "missing", never the value
+test -n "$HF_TOKEN" && echo "HF_TOKEN: set (${#HF_TOKEN} chars)" || echo "HF_TOKEN: missing"
+```
+
+Rotate any token you suspect may have been echoed.
 
 ## Container setup
 
-Pull the cosmos-predict2 base container (the same image used by the
-Fixer release toolchain):
+V2 inference uses a **two-stage image**: the public cosmos-predict2
+base, plus the V2 Fixer code layered on top via
+`Dockerfile.cosmos` shipped in the `nv-tlabs/Fixer` repo.
+
+### Pull the cosmos-predict2 base image
 
 ```bash
-IMAGE=nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
-docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE"
+BASE=nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
+docker image inspect "$BASE" >/dev/null 2>&1 || docker pull "$BASE"
 ```
 
-This container ships PyTorch 2.x, `cosmos_predict2`, NVIDIA
-Transformer Engine, and the CUDA / cuDNN stack Fixer needs. No
-custom image build is required for external inference-only use.
+This base ships PyTorch 2.x, `cosmos_predict2`, NVIDIA Transformer
+Engine, and the CUDA / cuDNN stack Fixer needs.
 
 If a site policy requires a mirrored / hardened variant of the
-container, consult your NGC account and substitute the image tag.
+container, consult your NGC account and substitute the base tag.
 Do not pin to `:latest` — pin to the dated minor release shown
 above for reproducibility.
+
+### Build the V2 inference image
+
+The V2 codebase (`nv-tlabs/Fixer`) ships `Dockerfile.cosmos`, which
+layers the Fixer Python source and its extra dependencies on top of
+the cosmos-predict2 base. Build it once per host:
+
+```bash
+FIXER_REPO_DIR=${FIXER_REPO_DIR:-$PWD/Fixer}
+IMAGE=nurec-fixer:v2
+
+git clone --depth 1 https://github.com/nv-tlabs/Fixer "$FIXER_REPO_DIR"
+cd "$FIXER_REPO_DIR"
+docker build -f Dockerfile.cosmos -t "$IMAGE" .
+```
+
+The build is ~120 GB on disk after the layers settle. The `IMAGE` tag
+`nurec-fixer:v2` is referenced by every `docker run` below; substitute
+your own if your site uses a registry-prefixed tag.
+
+> If a `docker build` failure cites a `state_dict` mismatch during a
+> downstream test step, you almost certainly cloned the legacy
+> `nv-tlabs/Difix3D` (V1) instead of `nv-tlabs/Fixer` (V2). Remove the
+> wrong clone and re-run the V2 clone above.
+
+### File ownership: MUST pin `-u $(id -u):$(id -g)`
+
+By default, processes inside an `nvcr.io` container run as `root`. Any
+file the container writes to a host bind mount lands on the host as
+`root:root 644` — which means the host user cannot `mv`, `chmod`,
+`cp`, or `rm` the output without `sudo`. Every documented `docker
+run` snippet below threads `-u $(id -u):$(id -g)` into the container
+so outputs are owned by **your** UID/GID. Do not drop this flag in
+copy-pasted variants — verify with `ls -l <output_dir>` after every
+run.
 
 ## Weight download
 
@@ -253,10 +343,11 @@ version control and never embed `HF_TOKEN` in a config file.
 
 A single `docker run --rm` invocation handles the end-to-end
 inference. Bind-mount the weights (read-only), the input frames
-directory (read-only), and the output directory (read-write):
+directory (read-only), and the output directory (read-write), and pin
+the container UID/GID to the host user so outputs land owned by you:
 
 ```bash
-IMAGE=nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
+IMAGE=nurec-fixer:v2                          # built from Dockerfile.cosmos above
 INPUT_DIR=/absolute/path/to/rendered_frames
 OUTPUT_DIR=/absolute/path/to/enhanced_frames
 MODELS_DIR=$(pwd)/models
@@ -268,6 +359,7 @@ mkdir -p "$OUTPUT_DIR"
 }
 
 docker run --gpus=all --rm --ipc=host \
+  -u "$(id -u):$(id -g)" \
   -v "$MODELS_DIR":/models:ro \
   -v "$INPUT_DIR":/in:ro \
   -v "$OUTPUT_DIR":/out \
@@ -279,17 +371,28 @@ docker run --gpus=all --rm --ipc=host \
     --timestep 250
 ```
 
+Verify ownership afterwards:
+
+```bash
+ls -l "$OUTPUT_DIR" | head            # first column should be your user, not 'root'
+stat -c '%U:%G' "$OUTPUT_DIR"/*.png | sort -u
+```
+
 Notes:
 
-- The script path inside the container (`/opt/fixer/src/...`) is
-  illustrative. If your copy of the container ships the Fixer code
-  at a different path (`/work/src/`, `/fixer-codebase/src/`, …),
-  adjust the path or `docker cp` the corresponding `.py` file from
-  the open-source [Difix3D+ repo](https://github.com/nv-tlabs/Difix3D)
-  before running. See [Troubleshooting](#troubleshooting).
+- The in-container script path `/opt/fixer/src/inference_pretrained_model.py`
+  is where `Dockerfile.cosmos` copies the V2 source. If your build
+  ships it at a different path, run `docker run --rm "$IMAGE" find / -name
+  inference_pretrained_model.py 2>/dev/null` once to locate it. Do
+  **not** fall back to the V1 `nv-tlabs/Difix3D` script — it expects a
+  V1 checkpoint and will crash with a state-dict mismatch against the
+  `nvidia/Fixer` weights.
 - `--ipc=host` is standard for NGC containers and harmless.
 - Do not pass `torchrun` / `--nproc_per_node` — the inference script
   is single-process, single-GPU.
+- The first run with `-u $(id -u):$(id -g)` may emit harmless
+  warnings about an unknown UID inside the container (no entry in
+  `/etc/passwd`); ignore them.
 
 ### Common inference flags
 
@@ -328,7 +431,10 @@ Prepare a dataset in the layout documented in
 then evaluate:
 
 ```bash
+IMAGE=nurec-fixer:v2
+
 docker run --gpus=all --rm --ipc=host \
+  -u "$(id -u):$(id -g)" \
   -v "$MODELS_DIR":/models:ro \
   -v /absolute/path/to/test_dataset:/data:ro \
   -v /absolute/path/to/eval_out:/eval \
@@ -358,6 +464,9 @@ runs Fixer, compares the output to the paired
 - [`references/export-and-reload.md`](references/export-and-reload.md)
   — how to export the pretrained model once and reload it for faster
   repeat inference.
+- [`references/teardown.md`](references/teardown.md) — full disk
+  reclaim inventory, ownership-recovery commands, and post-teardown
+  verification.
 - [`references/troubleshooting.md`](references/troubleshooting.md)
   — extended troubleshooting catalogue.
 - Sibling skill — NRE reconstruction and rendering pipeline that
@@ -367,9 +476,13 @@ runs Fixer, compares the output to the paired
   `PhysicalAI-Autonomous-Vehicles-NuRec` (USDZs whose renders Fixer
   is most commonly applied to):
   [`../physical-ai-datasets/SKILL.md`](../physical-ai-datasets/SKILL.md).
-- Upstream open-source Difix3D+ repo:
-  <https://github.com/nv-tlabs/Difix3D>
-- Pretrained weights (HuggingFace): <https://huggingface.co/nvidia/Fixer>
+- V2 inference code (canonical):
+  <https://github.com/nv-tlabs/Fixer>
+- V2 pretrained weights (HuggingFace):
+  <https://huggingface.co/nvidia/Fixer>
+- V1 / academic ancestor — Difix3D+:
+  <https://github.com/nv-tlabs/Difix3D> (incompatible state-dict; do
+  **not** load `nvidia/Fixer` weights against this code)
 - Cosmos-Predict2 container on NGC:
   <https://catalog.ngc.nvidia.com/orgs/nvidia/teams/cosmos/containers/cosmos-predict2-container>
 - Difix3D+ paper: <https://arxiv.org/abs/2503.01774>
@@ -378,36 +491,61 @@ runs Fixer, compares the output to the paired
 
 ## Limitations
 
-- **Rendered inputs only.** Fixer is trained on artifacts specific
-  to 3D reconstruction (Gaussian Splatting, NeRF, NRE). It is not a
-  general-purpose image enhancer and may distort real photographs.
+- **Rendered inputs only.** Fixer is trained on 3D-reconstruction
+  artifacts (3DGS, NeRF, NRE); it is not a general image enhancer and
+  may distort real photographs.
 - **Internal resolution fixed at 1024×576.** Inputs are resized to
-  that resolution before the model and resized back to the original
-  `(W, H)` after. Non-16:9 content is squashed and unsquashed; content
-  is preserved but geometric fidelity may be reduced.
-- **Sequence ordering depends on filename natural-sort.** Use zero-
-  padded, fixed-width indices (`frame_0001.png`) to avoid misordering.
-- **Temporal coherence.** Any temporal stabilisation relies on
-  the harmonizer's own prior outputs. Re-running on a non-empty
-  output directory mixes stale outputs into the reference window and
-  degrades quality — always start from an empty output directory.
-- **Beta release.** Flags, default timestep, and checkpoint format
-  may change between releases. Pin the container tag and checkpoint
-  revision for reproducibility.
+  that resolution before the model and back to `(W, H)` after.
+  Non-16:9 content is preserved but geometric fidelity may suffer.
+- **Sequence ordering depends on filename natural-sort.** Use
+  zero-padded indices (`frame_0001.png`) to avoid misordering.
+- **Temporal coherence relies on prior outputs.** Re-running on a
+  non-empty `output_dir` mixes stale frames into the reference window
+  and degrades quality — always start from an empty directory.
+- **Beta release.** Flags, timestep, and checkpoint format may change
+  between releases. Pin container tag + checkpoint for reproducibility.
 - **GPU architecture.** Requires Ampere or newer (compute capability
-  ≥ 8.0) because inference uses bfloat16 autocast.
+  ≥ 8.0; inference uses bfloat16 autocast).
+- **V2 weights are not compatible with V1 code** (`nv-tlabs/Difix3D`)
+  — see the [Run inference](#run-inference) note.
 
 ## Troubleshooting
 
-| Error / symptom | Cause | Solution |
-|-----------------|-------|----------|
-| `ImportError: transformer_engine` | Running inference outside the cosmos-predict2 container. | Use the `docker run` command in [Run inference](#run-inference). Do not install TE manually — it requires a matching CUDA / cuDNN / compiler stack. |
-| `CUDA error: out of memory` | GPU has < 12 GB VRAM, or batch size > 1. | Use a GPU with ≥ 16 GB VRAM, reduce `--batch-size` to 1, or close other GPU processes. |
-| Output frame count < input frame count | Input directory contains unsupported formats or hidden files. | Ensure all frames end in `.png`, `.jpg`, or `.jpeg`. Remove hidden files. |
-| Seam / visual discontinuity at early frames | The first few frames warm up the temporal window and look different from the rest. | Expected. Either discard the first pass of the first few frames, or prepend copies of the first frame and drop them from the output. |
-| Model checkpoint not found inside container | Forgot to mount `./models` as `/models`. | Add `-v "$MODELS_DIR":/models:ro` to the `docker run` command and point `--model` at `/models/pretrained/pretrained_fixer.pkl`. |
-| `HF_TOKEN` unset on weight download | Credential not exported. | `export HF_TOKEN=<token>` before calling `huggingface-cli`. Never write the token to a file checked into version control. |
-| Grid-like artifacts in output | Model regression on certain domains. | Reduce the perceptual loss scale at fine-tune time (`--lambda_lpips 0.03`); for inference-only use, try a different timestep value or revert to the non-Fixer render. |
+| Error / symptom | Most common cause |
+|-----------------|-------------------|
+| `state_dict` mismatch at model load | Cloned `nv-tlabs/Difix3D` (V1) instead of `nv-tlabs/Fixer` (V2). |
+| Output files owned by `root:root` | Forgot `-u $(id -u):$(id -g)` on `docker run`. |
+| `ImportError: transformer_engine` | Running inference outside the cosmos-predict2-based image. |
+| `CUDA error: out of memory` | GPU < 16 GB VRAM or batch size > 1. |
+| Model checkpoint not found in container | Forgot the `-v "$MODELS_DIR":/models:ro` mount. |
+| Output frame count < input frame count | Hidden files / unsupported extensions in input. |
 
-See [`references/troubleshooting.md`](references/troubleshooting.md)
-for an expanded catalogue.
+Full diagnostic table — root cause and fix for every row above — lives
+in [`references/troubleshooting.md`](references/troubleshooting.md).
+
+## Teardown
+
+A complete Fixer V2 workflow leaves roughly **~127 GB** on the host:
+~125 GB of container images (cosmos-predict2 base + the
+`Dockerfile.cosmos` build), ~5 GB of HuggingFace V2 weights, the V2
+source clone, and a sequence-dependent output directory. Reclaim disk
+with:
+
+```bash
+docker image rm nurec-fixer:v2 nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2 2>/dev/null || true
+docker image prune -f && docker builder prune -f
+rm -rf ./models "${HF_HOME:-$HOME/.cache/huggingface}/hub/models--nvidia--Fixer"
+rm -rf "${FIXER_REPO_DIR:-$PWD/Fixer}"
+rm -rf /absolute/path/to/enhanced_frames /absolute/path/to/eval_out
+rm -rf "${HOME}/.cache/nre/difix"     # only if you used --enable-difix
+```
+
+If outputs were created **before** `-u $(id -u):$(id -g)` was added to
+the `docker run` command, they are owned by `root` and need
+`sudo chown -R "$(id -u):$(id -g)" <dir>` first. See
+[`references/teardown.md`](references/teardown.md) for the full
+inventory, ownership-recovery commands, and post-teardown
+verification.
+
+Do **not** revoke `HF_TOKEN` as part of teardown unless you suspect it
+has been leaked (see [Verifying secrets safely](#verifying-secrets-safely)).

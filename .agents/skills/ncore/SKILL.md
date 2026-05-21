@@ -1,25 +1,34 @@
 ---
 name: ncore-data-conversion
 description: >-
-  Convert any sensor dataset into NVIDIA NCore V4 format (and feed it to NuRec
-  or a robotics-to-sim "r2s" pipeline). Use when ingesting raw cameras, LiDARs,
-  radars, IMUs, depth or stereo into V4 sequences; when authoring a new
-  converter from the template; when adapting PAI / Waymo / PandaSet / NuScenes
-  to V4; when handling non-AV rigs (mono+depth, mono+lidar, stereo,
-  multi-stereo, RGB-D, COLMAP/SfM, ROS2 bag); when wiring NCore shards into
-  multi-stage robotics pipelines (pose / depth / mask intermediate shards);
-  when diagnosing a broken converter against `validate.py` / NuRec data-quality
-  complaints.
-  Trigger keywords: ncore, ncore v4, convert, ingest, dataset, sensor, zarr,
-  itar, nurec, waymo, pandaset, nuscenes, pai, physicalai-autonomous-vehicles,
-  hyperion, colmap, scannetpp, stereo, multi-stereo, mono depth, mono lidar,
-  kitti, sfm, camera, lidar, radar, imu, cuboid, poses, intrinsics, ego mask,
-  rolling shutter, ros2, rosbag, mcap, sqlite3, vio, slam, livox, ouster,
-  velodyne, hesai, robosense, realsense, zed, kinect, oak-d, rgb-d, depth
-  camera, drone, aerial, handheld, ground robot, legged robot, r2s, robotics,
-  semantic mask, sam2, grounded-sam, foundation stereo, moge, cuvslam, kiss-icp.
+  Use when converting any sensor dataset into NVIDIA NCore V4 format
+  (and feeding it to NuRec or a robotics-to-sim "r2s" pipeline).
+  Covers ingesting raw cameras, LiDARs, radars, IMUs, depth or stereo
+  into V4 sequences; authoring a new converter from the template;
+  adapting PAI / Waymo / PandaSet / NuScenes to V4; handling non-AV
+  rigs (mono+depth, mono+lidar, stereo, multi-stereo, RGB-D, COLMAP /
+  SfM, ROS2 bag); wiring NCore shards into multi-stage robotics
+  pipelines (pose / depth / mask intermediate shards); and diagnosing
+  a broken converter against `validate.py` / NuRec data-quality
+  complaints. Trigger keywords: ncore, ncore v4, convert, ingest,
+  zarr, itar, nurec, waymo, pandaset, nuscenes, pai,
+  physicalai-autonomous-vehicles, hyperion, colmap, scannetpp, stereo,
+  multi-stereo, mono depth, mono lidar, kitti, sfm, camera, lidar,
+  radar, imu, cuboid, poses, intrinsics, ego mask, rolling shutter,
+  ros2, rosbag, mcap, vio, slam, realsense, zed, rgb-d, r2s,
+  robotics, sam2, grounded-sam, cuvslam, kiss-icp.
 version: "0.1.0"
 author: NVIDIA NCore
+tags:
+  - ncore
+  - data-conversion
+  - autonomous-vehicles
+  - robotics
+  - sensors
+tools:
+  - Shell
+  - Read
+  - Write
 license: Apache-2.0
 metadata:
   upstream: https://github.com/NVIDIA/ncore
@@ -82,6 +91,39 @@ PAI converter on top of the template is wasted work and almost certainly wrong
 (rolling-shutter timing, FTheta intrinsics, Waymo camera-frame rotation, etc).
 
 ---
+
+## Prerequisites
+
+- Linux host with Python ≥ 3.10 and `pip`.
+- `git` for the upstream converter sources.
+- `bazel` only if you run the in-tree converters (Path A); pure-Python
+  in-process writes (`ncore.data.v4`) need no Bazel.
+- Disk: budget tens of GB per converted clip; pre-zarr scratch can be
+  larger than the final `.zarr.itar`.
+- HuggingFace token (`HF_TOKEN`) only if pulling a gated PAI clip.
+
+### Verifying secrets safely
+
+**Always verify prerequisites with the upstream `validate.py` or by
+running the converter against a tiny test slice; never write ad-hoc
+bash that interpolates `HF_TOKEN` values.** The common one-liner
+
+```bash
+# BAD — leaks the secret to the terminal when the variable is set
+echo "HF_TOKEN: ${HF_TOKEN:+yes}${HF_TOKEN:-no}"
+```
+
+prints `yes<token-value>` whenever `HF_TOKEN` is set, because
+`${VAR:-no}` only falls back to "no" when the variable is empty. Use
+a length-only check, which never echoes the value:
+
+```bash
+# OK — prints "set (N chars)" or "missing", never the value
+test -n "$HF_TOKEN" && echo "HF_TOKEN: set (${#HF_TOKEN} chars)" || echo "HF_TOKEN: missing"
+```
+
+Rotate any token you suspect was echoed at
+<https://huggingface.co/settings/tokens>.
 
 ## Install & references
 

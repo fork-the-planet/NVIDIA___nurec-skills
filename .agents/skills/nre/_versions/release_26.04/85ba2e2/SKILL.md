@@ -4,27 +4,19 @@ description: >-
   Use when the user wants to run NVIDIA Omniverse NuRec / Neural
   Reconstruction Engine (NRE) on Linux x86_64 + NVIDIA GPU: train a
   3DGUT Gaussian reconstruction from an NCore camera+LiDAR clip via a
-  Hydra recipe like 3dgut_dynamic.yaml, generate NuRec aux data via
-  nre-tools, render frames locally (`render`) or through the
-  `serve-grpc` / `render-grpc` API, render LiDAR sweeps, export PLY /
-  ego-mask / depth / mesh / sequence- and NCore-tracks, repackage Asset
-  Harvester output into a USDZ, upgrade old USDZ artifacts, browse the
-  scene in the in-container viewer, or evaluate rendering metrics. Use
-  ONLY through the public NGC containers nvcr.io/nvidia/nre/nre and
+  Hydra recipe like 3dgut_dynamic.yaml, generate aux data via
+  nre-tools, render frames locally or through `serve-grpc` /
+  `render-grpc`, render LiDAR sweeps, export PLY / depth / mesh / ego
+  mask / tracks, repackage Asset Harvester output into a USDZ, upgrade
+  old USDZ artifacts, or evaluate rendering metrics. Use ONLY through
+  the public NGC containers nvcr.io/nvidia/nre/nre and
   nvcr.io/nvidia/nre/nre-tools with an NGC_API_KEY; never clone the
   source. Trigger keywords: nre, NRE, neural reconstruction engine,
-  nurec, NuRec, Omniverse NuRec, nvcr.io/nvidia/nre/nre, 3DGUT, 3DGRT,
-  3dgut_dynamic.yaml, MCMC densification, novel view synthesis,
-  val_sensor_transl_delta_m, render --custom-rig-trajectory,
-  export-gaussian-plys, export-ego-mask, export-depth, export-mesh,
-  export-ground-mesh, eval-ground-mesh, export-sequence-tracks,
-  export-ncore-tracks, export-external-assets, export-usdz-artifact,
-  export-parsed-config, export-artifact-structure, upgrade-artifact,
-  upgrade-config, gaussian-statistics, eval-rendering-metrics,
-  compute-metrics, viewer, ply_viewer, render, render-grpc,
-  render-novel-trajectory, serve-grpc, asset-harvester, nre-tools,
-  NuRec aux data, Mask2Former, USDZ, sensorsim gRPC,
-  PhysicalAI-Autonomous-Vehicles-NuRec, Difix, Cosmos Difix.
+  nurec, NuRec, Omniverse NuRec, 3DGUT, 3DGRT, 3dgut_dynamic.yaml,
+  export-gaussian-plys, export-mesh, export-ncore-tracks,
+  export-external-assets, upgrade-artifact, eval-rendering-metrics,
+  render-grpc, serve-grpc, nre-tools, USDZ,
+  PhysicalAI-Autonomous-Vehicles-NuRec, Difix.
 version: "0.2.0"
 author: NVIDIA Omniverse
 tags:
@@ -63,6 +55,15 @@ metadata:
 ---
 
 # NRE — NVIDIA Omniverse NuRec (Neural Reconstruction Engine)
+
+## Table of Contents
+
+- [When to Use](#when-to-use) · [When NOT to Use](#when-not-to-use) · [Inputs](#inputs) · [Instructions](#instructions) · [Output Format](#output-format)
+- [Scripts](#scripts) · [References](#references) · [Prerequisites](#prerequisites) · [Verifying secrets safely](#verifying-secrets-safely)
+- [Limitations](#limitations) · [Troubleshooting](#troubleshooting)
+- [Overview](#overview) · [Install — Docker / NGC container](#install--docker--ngc-container) · [CLI cookbook](#cli-cookbook)
+- [End-to-end workflows](#end-to-end-workflows) — A (NCore → reconstruction → render), B (Physical AI dataset), C (Asset-Harvester actors), D (multi-GPU), E (resume), F (upgrade-artifact), G (LiDAR sweeps), H (viewer), I (eval)
+- [Teardown](#teardown)
 
 ## When to Use
 
@@ -250,6 +251,9 @@ NRE container (no JSON state file required from the agent):
 - `references/physical-ai-render.md` — end-to-end recipe for rendering
   the HuggingFace `nvidia/PhysicalAI-Autonomous-Vehicles-NuRec`
   dataset, including NuRec ↔ ECEF ↔ ENU coordinate transforms.
+- `references/teardown.md` — full inventory of images, caches, and
+  outputs the workflow leaves behind, ownership-recovery commands,
+  and post-teardown verification.
 - Public product page: https://www.nvidia.com/en-us/omniverse/nurec/
 - HuggingFace dataset: https://huggingface.co/datasets/nvidia/PhysicalAI-Autonomous-Vehicles-NuRec
 - HuggingFace Fixer model: https://huggingface.co/nvidia/Difix3D
@@ -279,6 +283,40 @@ NRE container (no JSON state file required from the agent):
   checkpoints + exports.
 - **Memory / shm:** the container expects `--shm-size=64g` for
   training / export / render work and `--shm-size=2g` for `nre-tools`.
+- **File ownership.** Every documented `docker run` below threads
+  `-u "$(id -u):$(id -g)"` so artifacts (`metrics.yaml`, the USDZ,
+  PNG / JPG renders, MP4 videos) are owned by the host user. Without
+  this flag the container runs as `root` and every output requires
+  `sudo` to move, rename, or delete. If you ever omit it, recover
+  with `sudo chown -R "$(id -u):$(id -g)" <output_dir>`.
+
+### Verifying secrets safely
+
+**Always verify prerequisites by running
+[`scripts/validate_setup.py`](scripts/validate_setup.py); never by
+writing ad-hoc bash that interpolates `NGC_API_KEY` / `HF_TOKEN`
+values.** The common one-liner
+
+```bash
+# BAD — leaks the secret to the terminal when the variable is set
+echo "NGC_API_KEY: ${NGC_API_KEY:+yes}${NGC_API_KEY:-no}"
+```
+
+prints `yes<token-value>` whenever `NGC_API_KEY` is set, because
+`${VAR:-no}` only falls back to "no" when `VAR` is empty — when set
+it expands to `$VAR`. Use a length-only check instead, which never
+echoes the value:
+
+```bash
+# OK — prints "set (N chars)" or "missing", never the value
+test -n "$NGC_API_KEY" && echo "NGC_API_KEY: set (${#NGC_API_KEY} chars)" || echo "NGC_API_KEY: missing"
+```
+
+`docker login nvcr.io` should always use `--password-stdin` (as in
+[Install — Docker / NGC container](#install--docker--ngc-container))
+so the key never appears in process tables or shell history. If you
+suspect a token was echoed, rotate it at
+<https://org.ngc.nvidia.com/setup/api-key>.
 
 ## Limitations
 
@@ -424,6 +462,7 @@ Most-used invocations:
 ```bash
 # Train + validate a Waymo-style dynamic 3DGUT reconstruction.
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   -e NGC_API_KEY=${NGC_API_KEY} \
   --volume /path/to/dataset:/workdir/dataset \
   --volume /path/to/output:/workdir/output \
@@ -441,6 +480,7 @@ docker run --shm-size=64g -it --rm --gpus all \
 ```bash
 # Re-validate the trained model with a 3 m lateral shift.
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   -e NGC_API_KEY=${NGC_API_KEY} \
   --volume /path/to/dataset:/workdir/dataset \
   --volume /path/to/output:/workdir/output \
@@ -456,6 +496,7 @@ docker run --shm-size=64g -it --rm --gpus all \
 # Render frames locally (no gRPC) along the training trajectory at
 # quarter resolution, encoding an MP4 per camera.
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   --volume /path/to/output:/workdir/output \
   nvcr.io/nvidia/nre/nre:latest \
   render \
@@ -481,6 +522,7 @@ docker run --shm-size=64g -it --rm --gpus all \
 # 48 GB Ampere/Ada GPU: ~270 ms per 1920x1080 frame (~5x slower wall
 # time vs the 0.25 quarter-res preset above).
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   -e NGC_API_KEY=${NGC_API_KEY} \
   --volume /path/to/scene:/workdir/scene:ro \
   --volume /path/to/output:/workdir/output \
@@ -528,6 +570,7 @@ ffmpeg -framerate 30 \
 # Launch the sensorsim gRPC server on a trained USDZ, with editing
 # enabled (so render-grpc --edit-assets can apply edits later).
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   --net=host --privileged \
   -e NGC_API_KEY=${NGC_API_KEY} \
   --volume /path/to/output:/workdir/output \
@@ -543,6 +586,7 @@ docker run --shm-size=64g -it --rm --gpus all \
 ```bash
 # Render a LiDAR sweep from a running serve-grpc instance.
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   --network host \
   --volume /path/to/output:/workdir/output \
   nvcr.io/nvidia/nre/nre:latest \
@@ -606,6 +650,7 @@ conversion (NuRec ↔ ECEF ↔ OpenDRIVE ENU) lives in
 ```bash
 # Explicit: 4 GPUs on 1 node.
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   -e NGC_API_KEY=${NGC_API_KEY} \
   -e CUDA_VISIBLE_DEVICES=0,1,2,3 \
   --volume /path/to/dataset:/workdir/dataset \
@@ -629,6 +674,7 @@ single-clip jobs prefer 4–6 GPUs over higher counts.
 
 ```bash
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   -e NGC_API_KEY=${NGC_API_KEY} \
   --volume /path/to/dataset:/workdir/dataset \
   --volume /path/to/output:/workdir/output \
@@ -647,6 +693,7 @@ change between the original and resumed runs.
 
 ```bash
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   --volume /path/to/output:/workdir/output \
   nvcr.io/nvidia/nre/nre:latest \
   upgrade-artifact \
@@ -667,6 +714,7 @@ more `render-grpc --lidar` workers:
 ```bash
 # Server (one terminal).
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   --net=host --privileged \
   -e NGC_API_KEY=${NGC_API_KEY} \
   --volume /path/to/output:/workdir/output \
@@ -679,6 +727,7 @@ docker run --shm-size=64g -it --rm --gpus all \
 
 # Client (another terminal / job).
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   --network host \
   --volume /path/to/output:/workdir/output \
   nvcr.io/nvidia/nre/nre:latest \
@@ -698,6 +747,7 @@ client against `nre.grpc.protos` — see `references/grpc-api.md`.
 
 ```bash
 docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
   --net=host \
   -e NGC_API_KEY=${NGC_API_KEY} \
   --volume /path/to/output:/workdir/output \
@@ -723,6 +773,7 @@ exported via `export-gaussian-plys`).
 
    ```bash
    docker run --rm --gpus all \
+     -u "$(id -u):$(id -g)" \
      --volume /path/to/output:/workdir/output \
      nvcr.io/nvidia/nre/nre:latest \
      eval-rendering-metrics \
@@ -734,3 +785,44 @@ exported via `export-gaussian-plys`).
 
    For one-off pairs, `compute-metrics --metric psnr|ssim|lpips|fid|...`
    is a lightweight alternative.
+
+## Teardown
+
+A full NRE workflow leaves ~120 GB of container images, a Fixer
+weights cache, NRE caches under `${HOME}/.cache/nre/`, and a
+clip-sized `<output_dir>/<RUN-ID>/` tree. Reclaim disk with:
+
+```bash
+# 1. Stop any long-lived serve-grpc container.
+docker ps --format '{{.ID}} {{.Image}} {{.Command}}' \
+  | awk '/serve-grpc/ {print $1}' | xargs -r docker rm -f
+
+# 2. Remove NRE container images (~120 GB).
+docker image rm nvcr.io/nvidia/nre/nre:latest nvcr.io/nvidia/nre/nre-tools:latest 2>/dev/null || true
+docker image prune -f && docker builder prune -f
+
+# 3. Remove NRE caches (Fixer weights + Hydra-resolved configs).
+rm -rf "${HOME}/.cache/nre"
+
+# 4. Remove outputs (no sudo needed because runs used -u $(id -u):$(id -g)).
+rm -rf /path/to/output/<RUN-ID>
+
+# 5. (optional) Remove NCore shards if no longer needed.
+rm -rf /path/to/dataset/<NAME>.zarr.itar /path/to/dataset/<NAME>.aux.*.zarr
+
+# 6. (optional) Logout from NGC.
+docker logout nvcr.io
+```
+
+Recover from outputs created **without** `-u` (root-owned):
+
+```bash
+sudo chown -R "$(id -u):$(id -g)" /path/to/output
+rm -rf /path/to/output/<RUN-ID>
+```
+
+Do **not** revoke `NGC_API_KEY` unless you suspect it has been leaked
+(see [Verifying secrets safely](#verifying-secrets-safely)).
+
+Full inventory, per-artifact sizes, and post-teardown verification
+commands live in [`references/teardown.md`](references/teardown.md).

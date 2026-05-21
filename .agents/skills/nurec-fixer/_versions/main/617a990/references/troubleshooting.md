@@ -36,13 +36,35 @@ not the host path.
 
 **Inference script path differs from the README**
 
-The release container may ship the inference scripts at
-`/work/src/`, `/opt/fixer/src/`, or `/fixer-codebase/src/` depending
-on the release. `docker run --rm -it <image> find / -name inference_pretrained_model.py 2>/dev/null`
-reveals the actual path. Alternatively, `docker cp` the script from
-the open-source Difix3D+ repo
-(<https://github.com/nv-tlabs/Difix3D>) into a host directory and
-bind-mount it at `/opt/fixer/src`.
+The image built from `Dockerfile.cosmos` copies the V2 source to
+`/opt/fixer/src/`, but a vendor-modified Dockerfile may place it
+elsewhere (`/work/src/`, `/fixer-codebase/src/`, …). Run
+`docker run --rm -it <image> find / -name inference_pretrained_model.py 2>/dev/null`
+to locate it. Do **not** fall back to `nv-tlabs/Difix3D` (V1 code) —
+loading the `nvidia/Fixer` V2 weights against V1 model definitions
+crashes at `state_dict` load with mismatched keys; this is the most
+common first-run failure for users coming from the V1 docs. Re-clone
+from <https://github.com/nv-tlabs/Fixer> and rebuild the image
+instead.
+
+**`state_dict` mismatch when loading the checkpoint**
+
+The image was built from the wrong source repo. The V2 model
+definitions (`nv-tlabs/Fixer`) and V2 weights (`nvidia/Fixer`) ship as
+a pair. If you cloned `nv-tlabs/Difix3D` instead, every parameter
+name mismatches; inspecting the checkpoint with
+`python -c "import torch; print(list(torch.load('models/pretrained/pretrained_fixer.pkl', map_location='cpu').keys())[:5])"`
+shows V2-style keys. Remove the wrong clone, clone
+`nv-tlabs/Fixer`, and rebuild `nurec-fixer:v2` via
+`docker build -f Dockerfile.cosmos`.
+
+**Output files owned by root after a `docker run`**
+
+The container ran without `-u $(id -u):$(id -g)`. Run
+`sudo chown -R "$(id -u):$(id -g)" <output_dir>` once, then re-issue
+the original command **with** the `-u` flag so subsequent runs land
+correctly. Every `docker run` snippet in `SKILL.md` includes this
+flag; verify your shell history did not drop it.
 
 **Aspect-ratio distortion in output**
 

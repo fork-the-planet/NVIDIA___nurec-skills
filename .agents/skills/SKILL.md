@@ -1,7 +1,7 @@
 ---
 name: nurec-index
 description: >-
-  Starting point for any NVIDIA NuRec task. Helps the agent pick the
+  Use when starting any NVIDIA NuRec task. Helps the agent pick the
   right sibling skill — `nre` (train and render reconstructions),
   `ncore-data-conversion` (prepare input data), `asset-harvester`
   (extract 3D objects from driving clips), `nurec-fixer` (clean up
@@ -9,12 +9,12 @@ description: >-
   Hugging Face). Read this skill first whenever a user mentions
   NuRec, NRE, neural reconstruction, USDZ rendering, 3DGUT, gaussian
   splatting from driving logs, sensor sim, or asks "which skill
-  should I use for X?". Trigger keywords: nurec, nurec index, nurec
-  table of contents, nurec toc, nurec router, neural reconstruction
-  engine, NRE, 3DGUT, 3DGRT, USDZ, sensorsim, novel view synthesis,
-  PhysicalAI-Autonomous-Vehicles-NuRec, NuRec end-to-end, NuRec
-  pipeline, NuRec workflow, where do I start with NuRec, getting
-  started with NuRec.
+  should I use for X?". Also points to the cross-skill teardown
+  inventory. Trigger keywords: nurec, nurec index, nurec router,
+  neural reconstruction engine, NRE, 3DGUT, 3DGRT, USDZ, sensorsim,
+  novel view synthesis, PhysicalAI-Autonomous-Vehicles-NuRec, NuRec
+  end-to-end, NuRec pipeline, NuRec workflow, where do I start with
+  NuRec, getting started with NuRec, nurec teardown, cleanup.
 version: "0.2.0"
 author: NVIDIA NRS
 tags:
@@ -22,6 +22,8 @@ tags:
   - index
   - router
   - table-of-contents
+tools:
+  - Read
 license: Apache-2.0
 metadata:
   canonical_repo: https://github.com/NVIDIA/nurec-skills
@@ -250,6 +252,56 @@ come back here.
   Cosmos-Drive-Dreams is **synthetic** weather-augmented video
   (CC-BY-4.0). The NuRec dataset is **real** driving scenes turned
   into renderable USDZs (gated AV License).
+
+## Cross-skill teardown
+
+A complete NuRec workflow can leave **150 GB+ on disk** between
+container images, model weights, code clones, conda envs, and
+output directories. Each sibling skill has its own dedicated
+"Teardown" section — use them in this order when you no longer
+need the workflow:
+
+| Sibling skill | What to read | Approximate footprint |
+|---------------|--------------|------------------------|
+| `nre` | [Teardown](nre/SKILL.md#teardown) + [`references/teardown.md`](nre/_versions/release_26.04/85ba2e2/references/teardown.md) | ~120 GB images + caches + per-run outputs |
+| `nurec-fixer` | [Teardown](nurec-fixer/SKILL.md#teardown) + [`references/teardown.md`](nurec-fixer/_versions/main/617a990/references/teardown.md) | ~127 GB images + weights + outputs |
+| `asset-harvester` | [Teardown](asset-harvester/SKILL.md#teardown) | ~30 GB conda envs + checkpoints + outputs |
+| `ncore-data-conversion` | NCore shards live under `<dataset_dir>/`; delete after you're done with NRE training | clip-dependent |
+| `physical-ai-datasets` | HF caches live under `${HF_HOME:-$HOME/.cache/huggingface}/hub/`; remove per-dataset directories | dataset-dependent |
+
+Two practical tips that apply across every container-based skill in
+this set:
+
+1. **Pin `-u $(id -u):$(id -g)` on every `docker run`** so outputs
+   land owned by you, not by `root`. Every documented `docker run`
+   command in `nre` and `nurec-fixer` already does this. If outputs
+   end up `root`-owned anyway, recover with
+   `sudo chown -R "$(id -u):$(id -g)" <output_dir>` before deleting.
+2. **Do not revoke `NGC_API_KEY` / `HF_TOKEN` as part of teardown**
+   unless you have reason to believe they were leaked — they are
+   per-user and shared across every NVIDIA workflow on the host.
+
+## Secrets handling across every sibling skill
+
+Every sibling skill on this index includes a `Verifying secrets
+safely` block in its Prerequisites section. **Always verify
+prerequisites by running `scripts/validate_setup.py` (where it
+exists) or, for skills without one (`ncore-data-conversion`,
+`physical-ai-datasets`, this index), use `hf auth whoami` or a
+length-only shell check. Never write ad-hoc bash that interpolates
+secret values.**
+
+In particular, do not use the bash anti-pattern
+
+```bash
+# BAD — leaks the secret to the terminal when the variable is set
+echo "HF_TOKEN: ${HF_TOKEN:+yes}${HF_TOKEN:-no}"
+```
+
+— this prints `yes<token-value>` because `${VAR:-no}` only falls back
+to "no" when the variable is empty. If you suspect a token was
+echoed, rotate it (`huggingface.co/settings/tokens`,
+`org.ngc.nvidia.com/setup/api-key`) before continuing.
 
 ## Find a skill that isn't already on disk
 

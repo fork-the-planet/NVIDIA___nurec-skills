@@ -290,6 +290,55 @@ items:
   judge_rubric:
   - The response instructs the user to accept the model-card terms on the nvidia/asset-harvester HF page.
   - The response instructs the user to authenticate with hf auth login using a token from huggingface.co/settings/tokens.
+- id: asset-harvester.013
+  category: single-tool
+  tools_required:
+  - asset-harvester
+  user_prompt: 'I finished an end-to-end Asset Harvester run. What cleanup steps
+
+    do I run to reclaim disk? Cover both the conda envs and the
+
+    downloaded checkpoints / outputs.
+
+    '
+  timeout_seconds: 120
+  expected_signals:
+  - conda env remove
+  - rm -rf
+  expected_signals_any:
+  - ./checkpoints
+  - ./outputs
+  - asset-harvester
+  forbidden_signals:
+  - gitlab-master.nvidia.com
+  judge_rubric:
+  - The response removes the asset-harvester conda env (and the av-object-benchmark env if it was created).
+  - The response removes the downloaded HuggingFace checkpoints under ./checkpoints (and the HF hub cache).
+  - The response removes per-sample outputs (gaussians.ply, multiview.mp4, …) under ./outputs.
+- id: asset-harvester.014
+  category: single-tool
+  tools_required:
+  - asset-harvester
+  user_prompt: 'How should I check that HF_TOKEN is set on my host before running
+
+    Asset Harvester? Give me a safe one-liner.
+
+    '
+  timeout_seconds: 60
+  expected_signals_any:
+  - validate_setup.py
+  - test -n
+  - '${#HF_TOKEN}'
+  - hf auth whoami
+  forbidden_signals:
+  - gitlab-master.nvidia.com
+  - ${HF_TOKEN:-no}
+  - ${HF_TOKEN:+yes}${HF_TOKEN
+  judge_rubric:
+  - The response recommends a presence/length check or scripts/validate_setup.py rather than ad-hoc bash
+    that substitutes the secret value.
+  - The response does not propose the broken ${VAR:+yes}${VAR:-no} pattern, which echoes the token when
+    VAR is set.
 generated_at: '2026-05-08T23:07:28Z'
 generated_with:
   provider: openai-compatible
