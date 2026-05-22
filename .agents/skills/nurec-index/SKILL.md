@@ -46,9 +46,11 @@ already on disk](#find-a-skill-that-isnt-already-on-disk).
 > coordination layers. The canonical sources live upstream — NCore
 > (<https://github.com/NVIDIA/ncore>), the NRE NGC containers
 > (`nvcr.io/nvidia/nre/nre`, `nvcr.io/nvidia/nre/nre-tools`), Asset
-> Harvester (<https://github.com/NVIDIA/asset-harvester>), Fixer
-> (<https://huggingface.co/nvidia/Fixer>), and the `PhysicalAI-*`
-> Hugging Face datasets under <https://huggingface.co/nvidia>. Each
+> Harvester (<https://github.com/NVIDIA/asset-harvester>), the unified
+> Fixer & Harmonizer
+> (<https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nre/models/nurec-fixer>),
+> and the `PhysicalAI-*` Hugging Face datasets under
+> <https://huggingface.co/nvidia>. Each
 > sibling skill links its upstream in its frontmatter
 > `metadata.upstream` field.
 
@@ -233,12 +235,13 @@ come back here.
   differently. `nre`'s `--enable-difix` flag runs a built-in Fixer
   variant (`cosmos_difix` by default since 25.09, or `sd_difix` for
   the legacy Stable-Diffusion build) inside the NRE container as
-  it renders. The `nurec-fixer` skill is the standalone Fixer
-  release on Hugging Face (`nvidia/Fixer`) that runs in the
-  `cosmos-predict2-container` on a folder of already-rendered
-  frames. Default to the built-in one; reach for `nurec-fixer`
-  when you want to swap model variants, fix frames that were
-  rendered earlier, or evaluate PSNR / LPIPS on a paired test set.
+  it renders. The `nurec-fixer` skill is the standalone unified
+  Fixer & Harmonizer release on NGC
+  (`nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer`) that runs
+  inside the public `pytorch:24.10-py3` base image on a folder of
+  already-rendered frames. Default to the built-in one; reach for
+  `nurec-fixer` when you want to swap model variants or fix frames
+  that were rendered earlier.
 - **`ncore-data-conversion` vs `nre`.** They run **in order**, never
   as alternatives. `ncore-data-conversion` produces the input
   format; `nre` reads it.
@@ -264,7 +267,7 @@ need the workflow:
 | Sibling skill | What to read | Approximate footprint |
 |---------------|--------------|------------------------|
 | `nre` | [Teardown](nre/SKILL.md#teardown) + [`references/teardown.md`](nre/_versions/release_26.04/85ba2e2/references/teardown.md) | ~120 GB images + caches + per-run outputs |
-| `nurec-fixer` | [Teardown](nurec-fixer/SKILL.md#teardown) + [`references/teardown.md`](nurec-fixer/_versions/main/617a990/references/teardown.md) | ~127 GB images + weights + outputs |
+| `nurec-fixer` | [Teardown](nurec-fixer/SKILL.md#teardown) + [`references/teardown.md`](nurec-fixer/_versions/main/617a990/references/teardown.md) | ~30 GB image + harmonizer artifact + outputs |
 | `asset-harvester` | [Teardown](asset-harvester/SKILL.md#teardown) | ~30 GB conda envs + checkpoints + outputs |
 | `ncore-data-conversion` | NCore shards live under `<dataset_dir>/`; delete after you're done with NRE training | clip-dependent |
 | `physical-ai-datasets` | HF caches live under `${HF_HOME:-$HOME/.cache/huggingface}/hub/`; remove per-dataset directories | dataset-dependent |

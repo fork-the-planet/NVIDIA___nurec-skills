@@ -7,19 +7,22 @@ Checks performed (no network calls):
      OR `docker info` reports an `nvidia` runtime).
   3. `nvidia-smi` reports at least one GPU and a compute capability >= 8.0
      (Ampere or newer).
-  4. `HF_TOKEN` environment variable is set.
-  5. At least 50 GB of free disk space in the current working directory.
+  4. `NGC_API_KEY` environment variable is set.
+  5. `ngc` CLI is on PATH (used to download the harmonizer artifact).
+  6. At least 30 GB of free disk space in the current working directory.
 
 Usage:
     python scripts/validate_setup.py [--strict]
 
 Arguments:
-    --strict    Treat warnings (e.g. HF_TOKEN missing) as errors.
+    --strict    Treat warnings (e.g. NGC_API_KEY missing, ngc CLI absent)
+                as errors.
 
 Environment variables:
-    HF_TOKEN    Required (warning only without --strict). HuggingFace
-                access token for downloading nvidia/Fixer weights.
-                Create at: https://huggingface.co/settings/tokens
+    NGC_API_KEY    Required (warning only without --strict). NGC personal
+                   API key. Used for `docker login nvcr.io` and for
+                   `ngc registry model download-version`.
+                   Create at: https://ngc.nvidia.com/setup/personal-keys
 
 Exit codes:
     0 - all prerequisites met
@@ -37,7 +40,7 @@ from pathlib import Path
 
 
 MIN_COMPUTE_CAPABILITY = (8, 0)
-MIN_FREE_DISK_GB = 50
+MIN_FREE_DISK_GB = 30
 
 
 def _err(msg: str) -> None:
@@ -64,7 +67,6 @@ def check_nvidia_runtime() -> bool:
     if shutil.which("nvidia-container-cli") is not None:
         _ok("nvidia-container-cli found")
         return True
-    # Fall back to `docker info` parsing.
     try:
         out = subprocess.run(
             ["docker", "info"],
@@ -132,13 +134,31 @@ def check_gpu() -> bool:
     return True
 
 
-def check_hf_token(strict: bool) -> bool:
-    if os.environ.get("HF_TOKEN"):
-        _ok("HF_TOKEN is set")
+def check_ngc_api_key(strict: bool) -> bool:
+    if os.environ.get("NGC_API_KEY"):
+        _ok("NGC_API_KEY is set")
         return True
     msg = (
-        "HF_TOKEN environment variable not set — required to download "
-        "nvidia/Fixer weights. Create at https://huggingface.co/settings/tokens"
+        "NGC_API_KEY environment variable not set — required to pull "
+        "nvcr.io/nvidia/pytorch:24.10-py3 and to download the harmonizer "
+        "artifact nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer. "
+        "Create at https://ngc.nvidia.com/setup/personal-keys"
+    )
+    if strict:
+        _err(msg)
+        return False
+    _warn(msg)
+    return True
+
+
+def check_ngc_cli(strict: bool) -> bool:
+    if shutil.which("ngc") is not None:
+        _ok("ngc CLI found")
+        return True
+    msg = (
+        "ngc CLI not on PATH — install per "
+        "https://docs.ngc.nvidia.com/cli/ to download the harmonizer "
+        "artifact via `ngc registry model download-version`."
     )
     if strict:
         _err(msg)
@@ -171,7 +191,8 @@ def main() -> int:
         ("docker", check_docker()),
         ("nvidia-container-toolkit", check_nvidia_runtime()),
         ("gpu", check_gpu()),
-        ("hf-token", check_hf_token(args.strict)),
+        ("ngc-api-key", check_ngc_api_key(args.strict)),
+        ("ngc-cli", check_ngc_cli(args.strict)),
         ("disk-space", check_disk_space()),
     ]
     failed = [name for name, ok in checks if not ok]

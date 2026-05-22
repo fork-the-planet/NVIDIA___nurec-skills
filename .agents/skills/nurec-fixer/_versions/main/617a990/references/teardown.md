@@ -1,55 +1,50 @@
 # Teardown — nurec-fixer
 
-A complete Fixer V2 workflow leaves roughly **~127 GB** on the host:
+A complete unified Fixer & Harmonizer workflow leaves roughly **~30 GB**
+on the host:
 
 | Artifact | Size | Source |
 |----------|------|--------|
-| `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2` base image | ~5 GB | `docker pull` in Container setup |
-| `nurec-fixer:v2` layered image | ~120 GB | `docker build -f Dockerfile.cosmos` |
-| HuggingFace `nvidia/Fixer` weights (`./models/`) | ~5 GB | `huggingface-cli download` |
-| HuggingFace hub cache (`~/.cache/huggingface/hub/...`) | duplicate of `./models` | `huggingface-cli` |
-| `nv-tlabs/Fixer` source clone | <1 GB | `git clone` |
+| `nvcr.io/nvidia/pytorch:24.10-py3` base image | ~25 GB | `docker pull` in Container setup |
+| `nurec-fixer_vcosmos_3dgut_fixer_harmonizer/` artifact directory (two `.pt` checkpoints + `inference_jit_harmonizer.py` + `requirements.txt`) | ~5 GB | `ngc registry model download-version` |
+| Wrapper image (if you baked one per [`wrapper-image.md`](wrapper-image.md)) | +~2 GB on top of base | `docker build` |
 | `${HOME}/.cache/nre/difix/` (if `--enable-difix` was used in `nre`) | ~5 GB | NRE on first run |
-| Output frames + `metrics.yaml` | sequence-dependent | inference / evaluation runs |
+| Output frames | sequence-dependent | inference runs |
 
 ## Reclaim disk
 
 Run these in order. Each block is independent — skip blocks that
 don't apply.
 
-### 1. Container images (~125 GB)
+### 1. Container images (~25–27 GB)
 
 ```bash
-docker image rm nurec-fixer:v2 2>/dev/null || true
-docker image rm nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2 2>/dev/null || true
+docker image rm nurec-harmonizer:beta 2>/dev/null || true     # only if you baked the wrapper image
+docker image rm nvcr.io/nvidia/pytorch:24.10-py3 2>/dev/null || true
 docker image prune -f
-docker builder prune -f       # drops Dockerfile.cosmos build cache
+docker builder prune -f       # drops any wrapper-image build cache
 ```
 
-### 2. HuggingFace V2 weights (~5 GB)
+### 2. NGC harmonizer artifact (~5 GB)
 
 ```bash
-rm -rf ./models               # adjust if --local-dir was something else
-rm -rf "${HF_HOME:-$HOME/.cache/huggingface}/hub/models--nvidia--Fixer"
+rm -rf ./nurec-fixer_vcosmos_3dgut_fixer_harmonizer
 ```
 
-### 3. V2 source clone (<1 GB)
+If you used a custom `--dest` for `ngc registry model download-version`,
+substitute that path instead. The `.pt` checkpoints are the bulk of
+this directory.
 
-```bash
-rm -rf "${FIXER_REPO_DIR:-$PWD/Fixer}"
-```
-
-### 4. Render outputs (sequence-dependent)
+### 3. Render outputs (sequence-dependent)
 
 These were written with `-u $(id -u):$(id -g)` and can be removed
 without `sudo`:
 
 ```bash
 rm -rf /absolute/path/to/enhanced_frames
-rm -rf /absolute/path/to/eval_out
 ```
 
-### 5. NRE difix cache (~5 GB, only if you used `--enable-difix`)
+### 4. NRE difix cache (~5 GB, only if you used `--enable-difix`)
 
 ```bash
 rm -rf "${HOME}/.cache/nre/difix"
@@ -69,16 +64,15 @@ rm -rf /absolute/path/to/enhanced_frames
 ## Verify
 
 ```bash
-docker images | grep -E 'cosmos-predict2-container|nurec-fixer' || echo "images: clean"
-du -sh ./models "${HF_HOME:-$HOME/.cache/huggingface}/hub/models--nvidia--Fixer" 2>/dev/null || echo "weights: clean"
+docker images | grep -E 'pytorch:24\.10-py3|nurec-harmonizer' || echo "images: clean"
+du -sh ./nurec-fixer_vcosmos_3dgut_fixer_harmonizer 2>/dev/null || echo "artifact: clean"
 ```
 
 ## Secrets
 
-Do **not** revoke `HF_TOKEN` as part of teardown unless you suspect it
-has been leaked (see `Verifying secrets safely` in `SKILL.md`); the
-token is per-user and shared across HuggingFace workflows. If you
-*did* echo the token to stdout — for example via the
-`${HF_TOKEN:+yes}${HF_TOKEN:-no}` anti-pattern that expands to the
-literal value when set — rotate it immediately at
-https://huggingface.co/settings/tokens.
+Do **not** revoke `NGC_API_KEY` as part of teardown unless you suspect
+it has been leaked (see `Verifying secrets safely` in `SKILL.md`); the
+key is per-user and shared across NGC workflows. If you *did* echo the
+key to stdout — for example via the `${NGC_API_KEY:+yes}${NGC_API_KEY:-no}`
+anti-pattern that expands to the literal value when set — rotate it
+immediately at <https://ngc.nvidia.com/setup/personal-keys>.
