@@ -97,19 +97,20 @@ Rotate any token you suspect was echoed at
 ## Table of Contents
 
 1. [Common download recipe](#common-download-recipe) — HF auth, gating, CLI.
-2. [Pick a dataset by task](#pick-a-dataset-by-task) — fast lookup table.
-3. [Autonomous Vehicles](#autonomous-vehicles) — 5 datasets.
-4. [Robotics — Manipulation](#robotics--manipulation) — 6 datasets.
-5. [Robotics — GR00T](#robotics--gr00t) — 7 datasets.
-6. [Robotics — mindmap](#robotics--mindmap) — 4 datasets.
-7. [Robotics — NuRec / Sim-Ready scenes](#robotics--nurec--sim-ready-scenes) — 2 datasets.
-8. [Robotics — Healthcare](#robotics--healthcare) — 1 dataset.
-9. [Robotics — Grasping](#robotics--grasping) — 1 dataset.
-10. [Robotics — Physical / material properties](#robotics--physical--material-properties) — 2 datasets.
-11. [Spatial Intelligence + SimReady scenes](#spatial-intelligence--simready-scenes) — 5 datasets.
-12. [Community / sample](#community--sample) — 1 dataset.
-13. [License decision tree](#license-decision-tree) — what you can do with each.
-14. [Cross-skill usage map](#cross-skill-usage-map) — which skill consumes which dataset.
+2. [Filtered AV download recipe](#filtered-av-download-recipe) — default `hyperion_8.1` filter for `PhysicalAI-Autonomous-Vehicles` raw pulls.
+3. [Pick a dataset by task](#pick-a-dataset-by-task) — fast lookup table.
+4. [Autonomous Vehicles](#autonomous-vehicles) — 5 datasets.
+5. [Robotics — Manipulation](#robotics--manipulation) — 6 datasets.
+6. [Robotics — GR00T](#robotics--gr00t) — 7 datasets.
+7. [Robotics — mindmap](#robotics--mindmap) — 4 datasets.
+8. [Robotics — NuRec / Sim-Ready scenes](#robotics--nurec--sim-ready-scenes) — 2 datasets.
+9. [Robotics — Healthcare](#robotics--healthcare) — 1 dataset.
+10. [Robotics — Grasping](#robotics--grasping) — 1 dataset.
+11. [Robotics — Physical / material properties](#robotics--physical--material-properties) — 2 datasets.
+12. [Spatial Intelligence + SimReady scenes](#spatial-intelligence--simready-scenes) — 5 datasets.
+13. [Community / sample](#community--sample) — 1 dataset.
+14. [License decision tree](#license-decision-tree) — what you can do with each.
+15. [Cross-skill usage map](#cross-skill-usage-map) — which skill consumes which dataset.
 
 ## Common download recipe
 
@@ -157,6 +158,33 @@ Special-case downloaders:
   ([NVlabs/physical_ai_av](https://github.com/NVlabs/physical_ai_av))
   to filter by sensor / country / split before downloading; otherwise
   you will pull TBs you don't need.
+
+  **Default policy: pre-filter to `platform_class == 'hyperion_8.1'`
+  before any bulk pull.** The dataset mixes two sensor rigs
+  (`hyperion_8` and `hyperion_8.1`) and the entire downstream
+  NuRec / NCore / Asset-Harvester chain in this repo is *only*
+  validated for `hyperion_8.1`. Roughly half of the 306k clips fall
+  outside that platform, so the filter typically cuts the working set
+  (and download size) in half.
+
+  Apply this filter by default in any download script you generate.
+  Only skip the filter when the user **explicitly** asks for it (e.g.
+  "download all platforms", "include hyperion_8", "don't filter by
+  platform") or when they hand you a specific clip UUID — in that
+  single-clip case, `download_clip_features(clip_id=...)` is already
+  scoped and no platform filter is needed.
+
+  Canonical filtered recipe (see § [Filtered AV download recipe](#filtered-av-download-recipe)
+  below for an end-to-end example):
+
+  ```python
+  from physical_ai_av import PhysicalAIAVDatasetInterface
+
+  dataset = PhysicalAIAVDatasetInterface()
+  dataset.download_metadata()
+  dc = dataset.metadata['data_collection']
+  hyperion_81_clip_ids = dc[dc['platform_class'] == 'hyperion_8.1'].index.tolist()
+  ```
 - **PhysicalAI-Autonomous-Vehicle-Cosmos-Drive-Dreams** (3 TB) — use the
   upstream `download.py`
   ([nv-tlabs/Cosmos-Drive-Dreams](https://github.com/nv-tlabs/Cosmos-Drive-Dreams/blob/main/scripts/download.py))
@@ -170,6 +198,70 @@ For dataset filtering / preview: NVIDIA's
 [Cosmos Dataset Search (CDS)](https://build.nvidia.com/nvidia/cosmos-dataset-search)
 lets you query a 41K subset of the AV dataset semantically before
 downloading.
+
+## Filtered AV download recipe
+
+Always use this recipe (or a derivative of it) when the user asks to
+download raw clips from `PhysicalAI-Autonomous-Vehicles`. The
+`hyperion_8.1` filter is the **default**; it matches every downstream
+skill in this repo (`ncore`, `nre`, `asset-harvester`, `nurec-fixer`).
+
+When to **skip** the platform filter:
+
+1. The user explicitly opts out — e.g. "download all platforms",
+   "include hyperion_8 too", "ignore platform_class", or asks for a
+   dataset-wide statistic. In that case, drop the platform mask and
+   warn them that NuRec / NCore tooling will not work on the
+   `hyperion_8` clips.
+2. The user gave you a **specific clip UUID**. A single-clip
+   `download_clip_features(clip_id=...)` is already scoped, and
+   filtering by `platform_class` for one clip is pointless.
+
+Recipe (defaults: filter on; user may layer extra masks like country
+or sensor presence on top):
+
+```python
+from physical_ai_av import PhysicalAIAVDatasetInterface
+
+dataset = PhysicalAIAVDatasetInterface()
+
+dataset.download_metadata()
+dc = dataset.metadata['data_collection']
+
+clip_mask = dc['platform_class'] == 'hyperion_8.1'
+
+# Optional extra masks (only add when the user asked for them):
+# clip_mask &= dc['country'] == 'US'
+# sp = dataset.metadata['feature_presence']   # 26.03+; was 'sensor_presence' in 25.10
+# clip_mask &= sp['lidar_top_360fov']
+
+clip_ids = dc[clip_mask].index.tolist()
+print(f"Downloading {len(clip_ids)} hyperion_8.1 clips")
+
+dataset.download_clip_features(
+    clip_id=clip_ids,
+    features=["camera_front_wide_120fov", "lidar_top_360fov", "egomotion"],
+    max_workers=8,
+)
+```
+
+Single-clip fast path (no platform filter — the UUID is already
+specific):
+
+```python
+dataset.download_clip_features(
+    clip_id="<paste-clip-uuid>",
+    features=["camera_front_wide_120fov", "lidar_top_360fov", "egomotion"],
+)
+```
+
+Explicit opt-out (only when the user asked for it):
+
+```python
+clip_ids = dc.index.tolist()   # NO platform filter — all 306k clips
+# WARNING: downstream NuRec / NCore / Asset-Harvester only handle
+# the hyperion_8.1 subset.
+```
 
 ## Pick a dataset by task
 
@@ -217,7 +309,7 @@ The flagship real-world AV dataset.
 | Geography | 25 countries, 2500+ cities (US 155k, Germany 44k, …) |
 | Format | Per-sensor parquet/mp4 chunks of ~100 clips; UUIDs cross-link sensors |
 | License | **NVIDIA AV Dataset License Agreement** (gated; AV-development-only purpose; no biometric / surveillance / re-identification; expires 12 months after download) |
-| Toolkit | `pip install physical_ai_av` — direct filtered downloads + format docs |
+| Toolkit | `pip install physical_ai_av` — direct filtered downloads + format docs. **Default to filtering `metadata['data_collection']['platform_class'] == 'hyperion_8.1'` before any bulk pull** (see [Filtered AV download recipe](#filtered-av-download-recipe)); only skip the filter on explicit user request or when downloading a specific clip UUID. |
 | Versions | 26.03 (current; offline-optimized features for 97 % of clips), 25.10 (initial) |
 | Subset preview | 41k clips searchable on [Cosmos Dataset Search](https://build.nvidia.com/nvidia/cosmos-dataset-search) |
 | Use with | [`../ncore/SKILL.md`](../ncore/SKILL.md) (convert raw clips to NCore V4), [`../asset-harvester/SKILL.md`](../asset-harvester/SKILL.md) (extract per-object Gaussian assets). NuRec workflows are only validated for `platform_class == hyperion_8.1`. Upstream sim/training tools without an in-repo skill: `NVlabs/alpamayo-1.5`, `NVlabs/alpasim`, CARLA. |
@@ -708,8 +800,15 @@ GREEN when:
   agreement appears (re-accept after major version bumps).
 - **First chunk is 5 KB of HTML** — same cause as above.
 - **Download hangs indefinitely on AV (133 TB)** — you almost certainly
-  don't want the whole thing. Use `physical_ai_av` to filter by sensor /
-  country / split BEFORE pulling.
+  don't want the whole thing. Use `physical_ai_av` to filter
+  `platform_class == 'hyperion_8.1'` (default — see
+  [Filtered AV download recipe](#filtered-av-download-recipe)), plus
+  any sensor / country / split mask, BEFORE pulling.
+- **AV clip downloaded but downstream NCore / NuRec / Asset-Harvester
+  rejects it** — double-check `data_collection['platform_class']` for
+  that clip; only `hyperion_8.1` is validated. If it's `hyperion_8`,
+  either swap to a `hyperion_8.1` clip or accept that the downstream
+  reconstruction tooling will not work.
 - **Cosmos-Drive-Dreams 3 TB on a small disk** — pass
   `--file_types synthetic` (700 GB) or `--file_types hdmap` (small) to
   the official `download.py`.
