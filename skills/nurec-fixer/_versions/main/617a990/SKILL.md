@@ -1,32 +1,24 @@
 ---
 name: nurec-fixer
 description: >-
-  Use when a user wants to enhance, harmonize, or temporally stabilize
-  novel-view renders from a 3D reconstruction (especially NRE / NuRec
-  outputs) by running NVIDIA's unified Fixer & Harmonizer — a JIT
-  TorchScript model (Difix3D+ lineage) shipped on NGC at
+  Use when the user wants to enhance, harmonize, or temporally
+  stabilize novel-view renders from a 3D reconstruction (especially
+  NRE / NuRec outputs) by running NVIDIA's unified Fixer & Harmonizer
+  — a JIT TorchScript model (Difix3D+ lineage) shipped on NGC at
   `nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer` that removes
-  artifacts and harmonizes appearance in underconstrained regions of a
-  3D representation. Covers fetching the harmonizer artifact (the
-  inference script + `harmonizer_temporal.pt` +
-  `harmonizer_nontemporal.pt`) from NGC, running per-sequence inference
-  inside `nvcr.io/nvidia/pytorch:24.10-py3`, and consuming the same
-  weights via `nre --enable-difix`. Post-processing only — not for
-  training the reconstruction. Trigger keywords: nurec fixer, nurec
-  harmonizer, nvidia fixer, nvidia harmonizer, unified fixer harmonizer,
-  cosmos_3dgut_fixer_harmonizer, harmonizer_temporal.pt,
-  harmonizer_nontemporal.pt, inference_jit_harmonizer.py, difix,
-  difix3d+, ngc nurec-fixer, fix rendered frames, remove reconstruction
-  artifacts, temporal stabilization, --enable-difix.
+  artifacts and harmonizes appearance in underconstrained regions.
+  Covers fetching the artifact (inference script +
+  `harmonizer_temporal.pt` + `harmonizer_nontemporal.pt`) from NGC,
+  running per-sequence inference inside
+  `nvcr.io/nvidia/pytorch:24.10-py3`, and consuming the same weights
+  via `nre --enable-difix`. Post-processing only; do NOT use to
+  retrain a reconstruction or as a general image super-resolution
+  model. Trigger keywords: nurec fixer, nurec harmonizer, nvidia
+  fixer, unified fixer harmonizer, cosmos_3dgut_fixer_harmonizer,
+  harmonizer_temporal.pt, harmonizer_nontemporal.pt,
+  inference_jit_harmonizer.py, difix, difix3d+, fix rendered frames,
+  temporal stabilization, --enable-difix.
 version: "0.3.0"
-author: NVIDIA NuRec
-tags:
-  - nurec
-  - fixer
-  - harmonizer
-  - reconstruction
-  - autonomous-vehicles
-  - post-processing
 tools:
   - Shell
   - Read
@@ -47,6 +39,14 @@ dependencies:
   - python3
   - ngc-cli
 metadata:
+  author: NVIDIA NuRec
+  tags:
+    - nurec
+    - fixer
+    - harmonizer
+    - reconstruction
+    - autonomous-vehicles
+    - post-processing
   ngc_model: nvcr.io/nvidia/nre/nurec-fixer
   ngc_model_version: cosmos_3dgut_fixer_harmonizer
   ngc_model_page: https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nre/models/nurec-fixer?version=cosmos_3dgut_fixer_harmonizer
@@ -57,6 +57,31 @@ metadata:
 ---
 
 # NVIDIA Unified Fixer & Harmonizer (NuRec Post-Processing)
+
+## Purpose
+
+Run NVIDIA's unified Fixer & Harmonizer JIT TorchScript model
+(Difix3D+ lineage) on novel-view renders from a 3D reconstruction to
+remove artifacts (ghosting, floaters, splotches) and harmonize
+appearance in underconstrained regions. Either standalone via
+`inference_jit_harmonizer.py` inside `nvcr.io/nvidia/pytorch:24.10-py3`
+or through `nre --enable-difix` during NRE rendering.
+
+**Use this skill when:** the user has rendered frames from NRE or
+another 3D reconstruction pipeline and wants to clean them up before
+downstream consumption (training data, qualitative review, sensor
+sim, etc.).
+
+**Do NOT use this skill when:**
+
+- The user wants to retrain or fine-tune the reconstruction itself
+  (the Fixer is inference-only post-processing).
+- The user wants a general image super-resolution / denoiser — Fixer
+  is tuned for 3D-reconstruction artifacts, not arbitrary photos.
+- No NGC API key is available — both the model and the base image
+  live behind NGC auth.
+
+## Background
 
 A single TorchScript JIT model that removes artifacts and harmonizes
 appearance in novel-view renders produced by 3D reconstruction

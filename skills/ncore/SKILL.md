@@ -1,5 +1,5 @@
 ---
-name: ncore-data-conversion
+name: ncore
 description: >-
   Use when converting any sensor dataset into NVIDIA NCore V4 format
   (and feeding it to NuRec or a robotics-to-sim "r2s" pipeline).
@@ -7,36 +7,57 @@ description: >-
   into V4 sequences; authoring a new converter from the template;
   adapting PAI / Waymo / PandaSet / NuScenes to V4; handling non-AV
   rigs (mono+depth, mono+lidar, stereo, multi-stereo, RGB-D, COLMAP /
-  SfM, ROS2 bag); wiring NCore shards into multi-stage robotics
-  pipelines (pose / depth / mask intermediate shards); and diagnosing
-  a broken converter against `validate.py` / NuRec data-quality
-  complaints. Trigger keywords: ncore, ncore v4, convert, ingest,
-  zarr, itar, nurec, waymo, pandaset, nuscenes, pai,
-  physicalai-autonomous-vehicles, hyperion, colmap, scannetpp, stereo,
-  multi-stereo, mono depth, mono lidar, kitti, sfm, camera, lidar,
-  radar, imu, cuboid, poses, intrinsics, ego mask, rolling shutter,
-  ros2, rosbag, mcap, vio, slam, realsense, zed, rgb-d, r2s,
-  robotics, sam2, grounded-sam, cuvslam, kiss-icp.
+  SfM, ROS2 bag); and diagnosing a broken converter against
+  `validate.py`. Do NOT use to train reconstructions (use `nre`) or
+  to extract per-object 3D assets (use `asset-harvester`). Trigger
+  keywords: ncore, ncore v4, convert, ingest, zarr, itar, nurec,
+  waymo, pandaset, nuscenes, pai, hyperion, colmap, scannetpp,
+  stereo, multi-stereo, mono+depth, mono+lidar, kitti, sfm, camera,
+  lidar, radar, imu, cuboid, poses, intrinsics, ego mask, ros2,
+  rosbag, mcap, realsense, zed, rgb-d, r2s, robotics, sam2.
 version: "0.1.0"
-author: NVIDIA NCore
-tags:
-  - ncore
-  - data-conversion
-  - autonomous-vehicles
-  - robotics
-  - sensors
 tools:
   - Shell
   - Read
   - Write
 license: CC-BY-4.0
 metadata:
+  author: NVIDIA NCore
+  tags:
+    - ncore
+    - data-conversion
+    - autonomous-vehicles
+    - robotics
+    - sensors
   upstream: https://github.com/NVIDIA/ncore
   spec_docs: https://nvidia.github.io/ncore/data/conventions.html
   release_tag: "2026.04"
 ---
 
 # NCore V4 Data Conversion
+
+## Purpose
+
+Convert any sensor recording (cameras, LiDAR, radar, IMU, depth,
+stereo, COLMAP/SfM, ROS 2 bag) into a valid NVIDIA **NCore V4** store
+so it can be consumed by NuRec / Asset Harvester / `ncore_vis`, or
+wired into a robotics-to-sim ("r2s") pipeline. Drive the existing
+in-tree converters (PAI, Waymo, COLMAP/ScanNet++) or author a new
+converter from `ncore_template/`.
+
+**Use this skill when:** the user has raw sensor data (any rig) that
+NuRec or Asset Harvester needs to ingest, or when an existing
+converter is failing `validate.py` / producing NuRec data-quality
+complaints.
+
+**Do NOT use this skill when:**
+
+- The user is **already on V4** and only wants to train or render
+  (use the `nre` skill).
+- The user wants per-object 3D assets from sparse views (use
+  `asset-harvester`).
+- The user only needs to browse / pick an existing NVIDIA dataset
+  (use `physical-ai-datasets`).
 
 This skill teaches an agent to take **any** sensor dataset and produce a valid
 NCore V4 store that NuRec / Asset Harvester / `ncore_vis` will accept. It covers
@@ -204,6 +225,22 @@ it on the sequence's `generic_meta_data` (passed to
   later modules can pick refinement strategies that match the input quality.
 
 ---
+
+## Instructions
+
+Pick one of the two paths below.
+
+- **Path A** if the user's dataset format is already supported in
+  `ncore/tools/data_converter/` (PAI, Waymo, COLMAP/ScanNet++) —
+  bootstrap the upstream repo and drive the existing binary.
+- **Path B** if the format is unsupported (PandaSet, NuScenes, KITTI,
+  custom rig, robotics bag, …) — copy `ncore_template/` next to the
+  dataset and fill in the four hand-written hooks. The V4 conventions
+  in the **Mental model** section above are mandatory; the recipes
+  further down show typical configurations per rig.
+
+After conversion, always run the **Validation & end-to-end NuRec**
+section below before handing the store to NRE.
 
 ## Path A — drive an existing in-tree converter
 
@@ -951,7 +988,7 @@ post-conversion.
 
 ---
 
-## Common failure modes (and the fix file)
+## Troubleshooting (common failure modes and the fix file)
 
 The canonical fixes live in code (`example_converter.py` inline comments) and
 in the spec; most "NuRec produced garbage" complaints reduce to one of:
@@ -977,6 +1014,30 @@ in the spec; most "NuRec produced garbage" complaints reduce to one of:
 | IMU samples written into a "sensor" component and rejected by NuRec | IMU is not a first-class V4 component | Drop IMU samples into the pose trajectory (or `generic_meta_data["imu_samples"]`); never register an IMU writer |
 
 ---
+
+## Limitations
+
+- **No first-class IMU component.** V4 has no IMU sensor type — IMU
+  samples must ride in the pose trajectory or in `generic_meta_data`
+  (never as a sensor writer).
+- **Per-ray LiDAR is the only motion-comp-safe option** for spinning
+  LiDARs. If the dataset only gives frame-level timestamps, expect
+  motion-blur smearing in NuRec; reconstruct per-ray timestamps from
+  azimuth or accept the artefact.
+- **Sub-cm scene detail at world scale** requires float64 pose math
+  followed by re-referencing (`poses = inv(poses[0]) @ poses`)
+  *before* writing as float32. Raw UTM/ECEF casts to float32 will
+  silently lose centimetre-scale geometry.
+- **Rolling-shutter cameras** need per-camera per-frame
+  `[exposure_start, exposure_end]` *and* the correct `ShutterType`
+  by enum **name** — a single global timestamp will produce ghosting.
+- **Solid-state non-repetitive LiDAR (Livox-style)** must use
+  `PointCloudsComponent`, not `LidarSensorComponent` (the latter
+  assumes a column grid).
+- **The converter is one-way.** There is no `v4 → original` tool;
+  always keep the source dataset alongside.
+- This skill is **convert + validate only**. Training, rendering, or
+  USDZ packaging is the `nre` skill's job.
 
 ## Additional resources
 

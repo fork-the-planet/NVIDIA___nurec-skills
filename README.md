@@ -33,7 +33,7 @@ NuRec task to the right sibling skill below.
 |------|--------|----------------|---------|
 | [`nurec-index`](./.agents/skills/SKILL.md) | `.agents/skills/` | hand-curated | Router. Read first. Picks the right skill for any NuRec task. |
 | [`physical-ai-datasets`](./.agents/skills/physical-ai-datasets/SKILL.md) | `.agents/skills/physical-ai-datasets/` | hand-curated | Catalog of every NVIDIA `PhysicalAI-*` dataset on Hugging Face — AV, robotics, NuRec scenes, benchmarks. |
-| [`ncore-data-conversion`](./.agents/skills/ncore/SKILL.md) | `.agents/skills/ncore/` | upstream `2026.04` | Convert any sensor recording (cameras, LiDAR, radar, IMU, depth, stereo) into [NCore V4](https://github.com/NVIDIA/ncore) — the format NRE consumes. Includes a converter template. |
+| [`ncore`](./.agents/skills/ncore/SKILL.md) | `.agents/skills/ncore/` | upstream `2026.04` | Convert any sensor recording (cameras, LiDAR, radar, IMU, depth, stereo) into [NCore V4](https://github.com/NVIDIA/ncore) — the format NRE consumes. Includes a converter template. |
 | [`nre`](./.agents/skills/nre/SKILL.md) | `.agents/skills/nre/_versions/release_26.04/85ba2e2/` | NRE `release_26.04` | Train 3DGUT/3DGRT Gaussian reconstructions, render novel views (local or via gRPC), export PLY/mesh/depth, edit actors, evaluate quality. Drives the public `nvcr.io/nvidia/nre/{nre,nre-tools}` containers. |
 | [`asset-harvester`](./.agents/skills/asset-harvester/SKILL.md) | `.agents/skills/asset-harvester/_versions/main/e08b1b2/` | upstream `main` @ `e08b1b2` | Extract per-object 3D Gaussian Splat assets from sparse AV-clip views via SparseViewDiT + TokenGS. Open-source ([NVIDIA/asset-harvester](https://github.com/NVIDIA/asset-harvester), Apache-2.0). |
 | [`nurec-fixer`](./.agents/skills/nurec-fixer/SKILL.md) | `.agents/skills/nurec-fixer/_versions/main/617a990/` | upstream `main` @ `617a990` | Post-process novel-view renders with the NVIDIA Fixer (Difix3D+) diffusion model — removes ghosting, floaters, and temporal flicker. |
@@ -97,7 +97,7 @@ skills directory. For Cursor:
 ```bash
 mkdir -p ~/.cursor/skills
 ln -s "$(pwd)/.agents/skills/nre"               ~/.cursor/skills/nre
-ln -s "$(pwd)/.agents/skills/ncore"             ~/.cursor/skills/ncore-data-conversion
+ln -s "$(pwd)/.agents/skills/ncore"             ~/.cursor/skills/ncore
 ln -s "$(pwd)/.agents/skills/asset-harvester"   ~/.cursor/skills/asset-harvester
 ln -s "$(pwd)/.agents/skills/nurec-fixer"       ~/.cursor/skills/nurec-fixer
 ln -s "$(pwd)/.agents/skills/physical-ai-datasets" ~/.cursor/skills/physical-ai-datasets

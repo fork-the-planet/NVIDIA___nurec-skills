@@ -4,27 +4,20 @@ description: >-
   Use when the user wants to find, download, or pick a NVIDIA Physical
   AI dataset on Hugging Face for autonomous-vehicle, robotics, spatial
   intelligence, manipulation, or neural-reconstruction workflows.
-  Catalog of every dataset under https://huggingface.co/nvidia with
-  the `PhysicalAI-` prefix, organised by domain (Autonomous Vehicles,
-  Robotics-Manipulation, Robotics-GR00T, Robotics-mindmap,
-  Robotics-NuRec, Spatial Intelligence, Grasping, Healthcare,
-  Sim-Ready scenes, Material properties), with per-dataset size,
-  format, gating, license, and the downstream sibling skill
-  (`ncore-data-conversion`, `nre`, `asset-harvester`, `nurec-fixer`)
-  or upstream tool (Isaac Sim, CARLA, Isaac-GR00T, Cosmos-*) that
-  consumes it. Trigger keywords: nvidia physical ai dataset,
-  PhysicalAI- dataset, hf nvidia dataset, NCore dataset, NuRec
-  dataset, GR00T dataset, mindmap dataset, GraspGen, SimReady,
-  SmartSpaces, Cosmos-Drive-Dreams, Lyra SDG, Open-H-Embodiment,
-  huggingface-cli download, physical_ai_av, dataset gated, RDS-HQ.
+  Catalog of every dataset under huggingface.co/nvidia with the
+  `PhysicalAI-` prefix, organised by domain (AV, Robotics-Manipulation,
+  Robotics-GR00T, Robotics-mindmap, Robotics-NuRec, Spatial
+  Intelligence, Grasping, Healthcare, Sim-Ready, Material properties),
+  with per-dataset size, format, gating, license, and the downstream
+  sibling skill (`ncore`, `nre`, `asset-harvester`, `nurec-fixer`) or
+  upstream tool (Isaac Sim, CARLA, Isaac-GR00T, Cosmos-*) that
+  consumes it. Do NOT use as a runtime — it routes you elsewhere.
+  Trigger keywords: nvidia physical ai dataset, PhysicalAI- dataset,
+  hf nvidia dataset, NCore dataset, NuRec dataset, GR00T dataset,
+  GraspGen, SimReady, Cosmos-Drive-Dreams, Lyra SDG,
+  Open-H-Embodiment, huggingface-cli download, physical_ai_av,
+  dataset gated, RDS-HQ.
 version: "0.1.0"
-author: NVIDIA Physical AI
-tags:
-  - dataset-catalog
-  - physical-ai
-  - huggingface
-  - autonomous-vehicles
-  - robotics
 tools:
   - Shell
   - Read
@@ -41,6 +34,13 @@ compatibility: >-
   license acceptance on the HF dataset page before any token can pull
   them. Storage ranges from <1 GB to >100 TB (PhysicalAI-Autonomous-Vehicles, 133 TB).
 metadata:
+  author: NVIDIA Physical AI
+  tags:
+    - dataset-catalog
+    - physical-ai
+    - huggingface
+    - autonomous-vehicles
+    - robotics
   hf_org: https://huggingface.co/nvidia
   hf_collection: https://huggingface.co/collections/nvidia/physical-ai
   cosmos_dataset_search: https://build.nvidia.com/nvidia/cosmos-dataset-search
@@ -48,6 +48,31 @@ metadata:
 ---
 
 # NVIDIA Physical AI Datasets (Hugging Face)
+
+## Purpose
+
+Help the agent find, evaluate, and download an NVIDIA `PhysicalAI-*`
+dataset on Hugging Face that fits the user's downstream task —
+autonomous-vehicle reconstruction, robotics manipulation, GR00T
+post-training, spatial-intelligence research, grasping, or sim-ready
+content — and then hand off to the sibling skill (`ncore`, `nre`,
+`asset-harvester`, `nurec-fixer`) or upstream NVIDIA tool that
+actually consumes it.
+
+**Use this skill when:** the user asks "is there an NVIDIA dataset
+for X?", "where do I get NCore / NuRec / GR00T sample data?", or is
+shopping the Hugging Face NVIDIA org for `PhysicalAI-*` collections.
+
+**Do NOT use this skill when:**
+
+- The user already knows the dataset and just wants to run a
+  pipeline — jump straight to the consuming skill.
+- The user needs a non-NVIDIA dataset (Waymo, nuScenes, KITTI, …) —
+  this catalog is NVIDIA-only.
+- The user wants to train Cosmos / GR00T / Isaac Sim itself — that's
+  the upstream tool's job, not this catalog's.
+
+## Overview
 
 Catalog of NVIDIA's open Physical AI dataset family on Hugging Face.
 Pick by **task** (Section 2 § lookup table) or **family** (Sections 3–10).
@@ -268,7 +293,7 @@ clip_ids = dc.index.tolist()   # NO platform filter — all 306k clips
 | Goal | Recommended dataset(s) |
 |------|------------------------|
 | End-to-end AV training (real, multi-sensor) | `PhysicalAI-Autonomous-Vehicles` (133 TB, 1700 h, 25 countries) |
-| AV in NCore V4 format (drop-in for [`ncore-data-conversion`](../ncore/SKILL.md)) | `PhysicalAI-Autonomous-Vehicles-NCore` (~1.1k clips) |
+| AV in NCore V4 format (drop-in for [`ncore`](../ncore/SKILL.md)) | `PhysicalAI-Autonomous-Vehicles-NCore` (~1.1k clips) |
 | AV photoreal Sim2Real / weather augmentation | `PhysicalAI-Autonomous-Vehicle-Cosmos-Drive-Dreams` (3 TB; 7 weather variants) |
 | AV neural reconstructions ready for CARLA / NuRec | `PhysicalAI-Autonomous-Vehicles-NuRec` (918 USDZ scenes) |
 | Asset Harvester / 3DGS extraction sample clip | `PhysicalAI-Autonomous-Vehicles-NCore` |
@@ -821,6 +846,31 @@ GREEN when:
   `mindmap` data-generation docs.
 - **AV license expired (12 months)** — re-accept on the HF page; this
   is by-design per the License Agreement section 7.
+
+## Limitations
+
+- **Catalogue-only.** This skill does not actually run any
+  pipeline — it routes the agent to a sibling skill once the right
+  dataset is chosen.
+- **NVIDIA-only.** Non-NVIDIA datasets (Waymo, nuScenes, KITTI,
+  PandaSet, …) are out of scope; the `ncore` skill covers how to
+  convert *those* into NCore V4 manually.
+- **Gating is enforced by Hugging Face, not by this skill.** Several
+  datasets (e.g. `PhysicalAI-Autonomous-Vehicles*`,
+  `nvidia/Fixer`-adjacent assets, mindmap large variants) require
+  *both* license acceptance on the HF page *and* a valid `HF_TOKEN`.
+  Acceptances expire (AV is annual) and must be re-clicked.
+- **Footprint can be enormous.** PhysicalAI-Autonomous-Vehicles is
+  ~133 TB; Lyra-SDG ~25 TB; Cosmos-Drive-Dreams ~3 TB. Always check
+  free disk and use `--include` / `--exclude` filters before kicking
+  off a full pull.
+- **The catalogue drifts.** NVIDIA ships new `PhysicalAI-*` datasets
+  regularly. If a dataset isn't in this skill, browse
+  <https://huggingface.co/nvidia?search_models=PhysicalAI-> and
+  consider opening a PR to update Section 2 / the relevant family.
+- **No GPU / runtime checks here.** Storage and HF auth are the only
+  prerequisites this skill validates; per-dataset compute needs
+  belong to the consuming sibling skill.
 
 ## Source links
 

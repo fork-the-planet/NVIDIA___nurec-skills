@@ -9,7 +9,7 @@ host. Reclaim disk in the order below.
 | `nvcr.io/nvidia/nre/nre-tools:latest` | ~60 GB | `docker pull nvcr.io/nvidia/nre/nre-tools:latest` |
 | `${HOME}/.cache/nre/difix/` (Fixer weights) | ~5 GB | First run of `--enable-difix` |
 | `<output_dir>/<RUN-ID>/checkpoints/`, `usd-out/`, `val/`, `renders/`, `lidar/` | clip-dependent (often 10–50 GB / clip) | Training, export, and render commands |
-| NCore shards + aux data under `<dataset_dir>/` | clip-dependent | `ncore-data-conversion` / `nre-tools` aux generation |
+| NCore shards + aux data under `<dataset_dir>/` | clip-dependent | `ncore` / `nre-tools` aux generation |
 
 ## 1. Stop long-lived processes
 

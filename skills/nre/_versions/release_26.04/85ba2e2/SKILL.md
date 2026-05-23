@@ -6,25 +6,18 @@ description: >-
   3DGUT Gaussian reconstruction from an NCore camera+LiDAR clip via a
   Hydra recipe like 3dgut_dynamic.yaml, generate aux data via
   nre-tools, render frames locally or through `serve-grpc` /
-  `render-grpc`, render LiDAR sweeps, export PLY / depth / mesh / ego
-  mask / tracks, repackage Asset Harvester output into a USDZ, upgrade
-  old USDZ artifacts, or evaluate rendering metrics. Use ONLY through
-  the public NGC containers nvcr.io/nvidia/nre/nre and
-  nvcr.io/nvidia/nre/nre-tools with an NGC_API_KEY; never clone the
-  source. Trigger keywords: nre, NRE, neural reconstruction engine,
-  nurec, NuRec, Omniverse NuRec, 3DGUT, 3DGRT, 3dgut_dynamic.yaml,
-  export-gaussian-plys, export-mesh, export-ncore-tracks,
-  export-external-assets, upgrade-artifact, eval-rendering-metrics,
-  render-grpc, serve-grpc, nre-tools, USDZ,
-  PhysicalAI-Autonomous-Vehicles-NuRec, Difix.
+  `render-grpc`, export PLY / depth / mesh / ego mask / tracks,
+  repackage Asset Harvester output into a USDZ, or evaluate rendering
+  metrics. Use ONLY through the public NGC containers
+  nvcr.io/nvidia/nre/nre and nvcr.io/nvidia/nre/nre-tools with an
+  NGC_API_KEY; never clone the source. Do NOT use for per-object 3D
+  asset capture (use `asset-harvester`) or sensor-data conversion to
+  NCore (use `ncore`). Trigger keywords: nre, NRE, neural
+  reconstruction engine, nurec, NuRec, Omniverse NuRec, 3DGUT, 3DGRT,
+  3dgut_dynamic.yaml, export-gaussian-plys, export-mesh,
+  export-ncore-tracks, export-external-assets, eval-rendering-metrics,
+  render-grpc, serve-grpc, nre-tools, USDZ.
 version: "0.2.0"
-author: NVIDIA Omniverse
-tags:
-  - nurec
-  - autonomous-vehicles
-  - neural-reconstruction
-  - rendering
-  - container
 tools:
   - Shell
   - Read
@@ -44,6 +37,13 @@ dependencies:
   - docker
   - python3
 metadata:
+  author: NVIDIA Omniverse
+  tags:
+    - nurec
+    - autonomous-vehicles
+    - neural-reconstruction
+    - rendering
+    - container
   product_page: https://www.nvidia.com/en-us/omniverse/nurec/
   ngc_container: nvcr.io/nvidia/nre/nre:latest
   ngc_tools_container: nvcr.io/nvidia/nre/nre-tools:latest
@@ -55,6 +55,29 @@ metadata:
 ---
 
 # NRE — NVIDIA Omniverse NuRec (Neural Reconstruction Engine)
+
+## Purpose
+
+Drive the public NVIDIA Omniverse NuRec / Neural Reconstruction
+Engine containers (`nvcr.io/nvidia/nre/nre`,
+`nvcr.io/nvidia/nre/nre-tools`) to train a 3DGUT/3DGRT Gaussian
+reconstruction from an NCore V4 camera+LiDAR clip, render novel
+views (locally or via gRPC), generate aux data, export
+PLY/depth/mesh/ego-mask/tracks, package Asset Harvester output into a
+USDZ, and evaluate rendering metrics.
+
+**Use this skill when:** the user has an NCore V4 clip (or a USDZ +
+NRE artifact pair) on a Linux x86_64 host with an NVIDIA GPU and an
+NGC API key, and wants to train, render, or export with NRE.
+
+**Do NOT use this skill when:**
+
+- The user wants per-object 3D asset extraction from sparse views
+  (use `asset-harvester`).
+- The user still needs to convert raw sensor data into NCore V4
+  (use the `ncore` skill first).
+- The user only needs to clean up already-rendered frames
+  (use `nurec-fixer`).
 
 ## Table of Contents
 

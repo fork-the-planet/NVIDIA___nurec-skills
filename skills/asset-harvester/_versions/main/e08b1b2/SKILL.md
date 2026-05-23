@@ -1,29 +1,23 @@
 ---
 name: asset-harvester
 description: >-
-  Use when the user wants to install or run NVIDIA Asset Harvester — the
-  open-source Apache-2.0 image-to-3D pipeline at
+  Use when the user wants to install or run NVIDIA Asset Harvester —
+  the open-source Apache-2.0 image-to-3D pipeline at
   github.com/NVIDIA/asset-harvester that converts sparse object views
   from autonomous-vehicle NCore V4 driving logs (or single masked
   images) into simulation-ready 3D Gaussian Splat (.ply) assets via
   SparseViewDiT multiview diffusion plus TokenGS Gaussian lifting, and
   optionally emits metadata.yaml for NVIDIA Omniverse NuRec object
-  insertion. Trigger keywords: asset harvester, asset-harvester,
-  asset_harvester, nvidia/asset-harvester, SparseViewDiT, TokenGS,
-  image-to-3D AV, multiview diffusion, gaussian lifting, 3DGS from
-  NCore, gaussian splat from driving log, run_inference.py, run.sh,
-  run_ncore_parser.sh, AH_multiview_diffusion, AH_tokengs_lifting,
-  AH_camera_estimator, AH_object_seg_jit, external assets metadata,
-  NuRec object insertion, NCore V4 parser, harvest 3D assets from AV
-  clips, sparse-view to 3D, gsplat b60e917.
+  insertion. Do NOT use for full-scene reconstruction (use `nre`) or
+  for object inputs without per-object masks. Trigger keywords: asset
+  harvester, asset-harvester, nvidia/asset-harvester, SparseViewDiT,
+  TokenGS, image-to-3D AV, multiview diffusion, gaussian lifting, 3DGS
+  from NCore, gaussian splat from driving log, run_inference.py,
+  run.sh, run_ncore_parser.sh, AH_multiview_diffusion,
+  AH_tokengs_lifting, external assets metadata, NuRec object
+  insertion, NCore V4 parser, harvest 3D assets from AV clips,
+  sparse-view to 3D.
 version: "0.1.0"
-author: NVIDIA AV
-tags:
-  - asset-harvester
-  - autonomous-vehicles
-  - 3d-reconstruction
-  - gaussian-splatting
-  - simulation
 tools:
   - Shell
   - Read
@@ -43,6 +37,13 @@ dependencies:
   - git
   - python3
 metadata:
+  author: NVIDIA AV
+  tags:
+    - asset-harvester
+    - autonomous-vehicles
+    - 3d-reconstruction
+    - gaussian-splatting
+    - simulation
   upstream: https://github.com/NVIDIA/asset-harvester
   project_page: https://research.nvidia.com/labs/sil/projects/asset-harvester/
   paper: https://arxiv.org/abs/2604.18468
@@ -54,6 +55,29 @@ metadata:
 ---
 
 # Asset Harvester
+
+## Purpose
+
+Install and drive NVIDIA Asset Harvester to extract per-object 3D
+Gaussian Splat assets from sparse autonomous-vehicle (AV) object
+observations — either a multi-view crop pulled from an NCore V4
+driving log or a single masked image. The output is a
+simulation-ready `gaussians.ply` plus optional `metadata.yaml` that
+NVIDIA Omniverse NuRec can ingest as an external asset.
+
+**Use this skill when:** the user has AV clips or masked single
+images and wants per-object 3D assets via the SparseViewDiT + TokenGS
+pipeline at <https://github.com/NVIDIA/asset-harvester>.
+
+**Do NOT use this skill when:**
+
+- The user wants a full-scene reconstruction (use the `nre` skill).
+- The user has no per-object masks or AV-style object crops (Asset
+  Harvester expects object-centric, masked inputs).
+- The user wants to re-train SparseViewDiT or TokenGS from scratch —
+  this skill is install + inference only.
+
+## Background
 
 Open-source (Apache-2.0) image-to-3D pipeline that turns sparse,
 in-the-wild object observations from real autonomous-vehicle driving
@@ -99,7 +123,7 @@ Shipped model checkpoints (single HF repo `nvidia/asset-harvester`):
 - Closed-loop AV scene reconstruction (not object assets) — use the
   sibling [`nre`](../nre/SKILL.md) skill instead.
 - Ingesting raw sensor data into NCore V4 before harvesting — use
-  the sibling [`ncore-data-conversion`](../ncore/SKILL.md) skill;
+  the sibling [`ncore`](../ncore/SKILL.md) skill;
   Asset Harvester consumes NCore V4 stores, it does not produce
   them.
 - Running the HF Space demo (no install): point the user at
@@ -382,10 +406,10 @@ The resulting `./outputs/ncore_harvest_nurec/` directory is the NuRec
 external-assets input — see
 [NuRec docs](https://docs.nvidia.com/nurec/nurec/use-ah-assets.html).
 
-> ⚠️ Disable PPISP when reconstructing the scene with NuRec; PPISP
-> introduces color-space mismatches that over-saturate inserted assets.
-> Asset Harvester does **not** predict object scale — NuRec uses the
-> scales stored in the clip cuboid dimensions.
+> **Note:** Disable PPISP when reconstructing the scene with NuRec;
+> PPISP introduces color-space mismatches that over-saturate inserted
+> assets. Asset Harvester does **not** predict object scale — NuRec
+> uses the scales stored in the clip cuboid dimensions.
 
 ## Configuration Matrix (most common flags)
 
