@@ -29,7 +29,7 @@ tools:
   - Shell
   - Read
   - Write
-license: LicenseRef-NVIDIA
+license: CC-BY-4.0
 compatibility: >-
   Linux x86_64. 1+ NVIDIA GPU with CUDA 12.8 (Ampere A100/A10/A40/RTX
   A6000, Ada L20/L40/L40S, Hopper H100/H20, or Blackwell RTX Pro 6000D),

@@ -163,8 +163,17 @@ folder and update the symlinks at the skill root.
 
 ## License
 
-Each skill carries its own license in its frontmatter (`license:`).
-The repo as a whole is published by NVIDIA under the licenses noted on
-each individual skill — most are `Apache-2.0` (skills wrapping
-open-source upstreams) or `LicenseRef-NVIDIA` (the `nre` skill, which
-drives NVIDIA's proprietary NGC containers).
+This repo is dual-licensed:
+
+- **Skills** (every `SKILL.md` and its accompanying prose / references)
+  are licensed under [**CC-BY-4.0**](https://creativecommons.org/licenses/by/4.0/).
+  Each skill restates this in its frontmatter (`license: CC-BY-4.0`).
+- **Scripts** (everything under `scripts/` and the `ncore_template/`
+  Python package) are licensed under
+  [**Apache-2.0**](https://www.apache.org/licenses/LICENSE-2.0). Every
+  source file carries an `SPDX-License-Identifier: Apache-2.0` header.
+
+The skills only *drive* upstream NVIDIA artifacts (NGC containers,
+GitHub repos, Hugging Face models and datasets). Those upstream
+artifacts retain their own licenses — see each skill's `metadata:`
+block for the upstream pointer.

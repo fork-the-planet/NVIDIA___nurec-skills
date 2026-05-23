@@ -24,7 +24,7 @@ tags:
   - table-of-contents
 tools:
   - Read
-license: Apache-2.0
+license: CC-BY-4.0
 metadata:
   canonical_repo: https://github.com/NVIDIA/nurec-skills
   canonical_skills_dir: .agents/skills/

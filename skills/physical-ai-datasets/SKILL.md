@@ -29,7 +29,7 @@ tools:
   - Shell
   - Read
   - Write
-license: Apache-2.0
+license: CC-BY-4.0
 dependencies:
   - bash
   - python
