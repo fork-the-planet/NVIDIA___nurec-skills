@@ -1,163 +1,141 @@
-# Unified Fixer & Harmonizer — Extended Troubleshooting
+# DiffusionHarmonizer — Extended Troubleshooting
 
-## Installation / environment
+## Installation / Environment
 
 **`docker: Error response from daemon: could not select device driver "" with capabilities: [[gpu]]`**
 
-The NVIDIA Container Toolkit is not installed or not configured for
-the Docker runtime. Install from
+The NVIDIA Container Toolkit is not installed or Docker is not
+configured for the NVIDIA runtime. Install from
 <https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>
-and restart the Docker daemon.
+and restart Docker.
 
-**`Unable to find image 'nvcr.io/nvidia/pytorch:24.10-py3' locally`** followed by a 401 / 403
+**`docker pull` from `nvcr.io` returns 401 / 403**
 
-NGC requires authentication to pull NVIDIA-hosted containers. Run
-`docker login nvcr.io` with the literal username `$oauthtoken` and
-your `NGC_API_KEY` as the password (use `--password-stdin` to avoid
-echoing the key into shell history). Generate a key at
-<https://ngc.nvidia.com/setup/personal-keys>.
+Authenticate Docker to NGC if your environment requires it:
 
-**`ngc registry model download-version` returns 401 / 403**
+```bash
+echo "$NGC_API_KEY" | docker login nvcr.io --username '$oauthtoken' --password-stdin
+```
 
-The NGC CLI is not authenticated with a key that has access to the
-`nvidia/nre` model namespace. Confirm `NGC_API_KEY` is exported in
-the same shell, then run `ngc config set` to wire the CLI to the
-`nvidia` org and `nre` team. Re-issuing a personal key from
-<https://ngc.nvidia.com/setup/personal-keys> usually clears expired-key
-errors. If the model card itself appears empty in a browser, your
-account may not yet have NRE entitlement — file a support ticket
-rather than retrying the CLI.
+The username must be the literal string `$oauthtoken`. Do not paste the
+key into shell history.
 
-**`ngc: command not found`**
+**`hf download nvidia/DiffusionHarmonizer` returns 401 / 403**
 
-The NGC CLI is not on PATH. Install per
-<https://docs.ngc.nvidia.com/cli/>. As an alternative for one-off
-downloads, the model card on the NGC site has a "Download" button
-that returns a tarball; unpack it next to where the CLI would have
-written `nurec-fixer_vcosmos_3dgut_fixer_harmonizer/`.
+`HF_TOKEN` is missing, expired, lacks read scope, or the model license
+has not been accepted. Visit the model page in a browser, accept the
+license if gated, then run `hf auth login --token "$HF_TOKEN"`.
+
+**`hf: command not found`**
+
+Install the Hugging Face CLI:
+
+```bash
+python3 -m pip install --user "huggingface_hub[cli]"
+```
+
+Depending on package version, the executable may be `hf` or
+`huggingface-cli`.
+
+**Build fails because a patch does not apply**
+
+The patch may already be applied, or the installed Cosmos Predict2
+package version differs from the patch target. Prefer the public project
+Dockerfile for the checkout you are using. Apply `text2image_dit.patch`
+and `tokenizer.patch` manually only when running the raw base container.
 
 ## Runtime
 
-**Script can't find `harmonizer_temporal.pt` / `harmonizer_nontemporal.pt`**
+**`pretrained_harmonizer.pkl` cannot be found**
 
-Inside the container, the host artifact directory must be mounted
-at `/work` (read-only is fine). Double-check the `-v` flag in the
-`docker run` command and that `--temporal_model_path` /
-`--nontemporal_model_path` point at the path **inside** the
-container (`/work/harmonizer_temporal.pt`,
-`/work/harmonizer_nontemporal.pt`), not the host path.
+The expected model path after download is:
 
-**`unrecognized arguments: --nontemporal_model_path`**
+```text
+models/pretrained/pretrained_harmonizer.pkl
+```
 
-The beta artifact has been observed to spell this argument both as
-`--nontemporal_model_path` (in the inference example) and
-`--non_temporal_model_path` (in the argument table). Run
-`python /work/inference_jit_harmonizer.py --help` inside the
-container and use whichever name the live `--help` output advertises;
-the underlying parameter is the same. Do not patch the script — the
-.pt files are wired to the script's exact `argparse` definition.
+Run:
 
-**`pip install -r requirements.txt` fails with permission denied**
+```bash
+hf download nvidia/DiffusionHarmonizer --local-dir models
+```
 
-You probably dropped `-e PYTHONUSERBASE=/tmp/pyuser` from the
-`docker run` command. The container's site-packages directory is
-owned by root and cannot be written to under `-u $(id -u):$(id -g)`.
-Either keep `--user` + a writable `PYTHONUSERBASE`, or bake a wrapper
-image per [`wrapper-image.md`](wrapper-image.md) so the install
-happens at build time as root.
+from the code checkout, or adjust `--model` to the actual in-container
+path.
 
-**`RuntimeError: PytorchStreamReader failed reading zip archive`** when loading a `.pt` file
+**`No such file or directory: src/inference_pretrained_model_harmonizer.py`**
 
-The .pt download was truncated. Run
-`du -h nurec-fixer_vcosmos_3dgut_fixer_harmonizer/*.pt` — both files
-should be on the order of 1–2 GB each. If either is much smaller,
-delete the artifact directory and re-run
-`ngc registry model download-version`.
+The fixed README branch standardizes on
+`src/inference_pretrained_model.py`. Some intermediate branch text used
+the `_harmonizer` suffix. Use the script present in your checkout.
 
-**`RuntimeError: Could not run 'aten::...' with arguments from the 'CUDA' backend`** loading a `.pt` file
+**Output files are owned by root**
 
-You're running outside `nvcr.io/nvidia/pytorch:24.10-py3`. The JIT
-modules embed CUDA-specific kernels and only load reliably under the
-PyTorch / CUDA / cuDNN stack the artifact was traced against. Always
-run inference inside the documented base image; do not try to load
-the .pt files in a host Python environment.
+The container was run without `-u $(id -u):$(id -g)`. Recover once with:
 
-**Output files owned by root after a `docker run`**
+```bash
+sudo chown -R "$(id -u):$(id -g)" /absolute/path/to/output
+```
 
-The container ran without `-u $(id -u):$(id -g)`. Run
-`sudo chown -R "$(id -u):$(id -g)" <output_dir>` once, then re-issue
-the original command **with** the `-u` flag so subsequent runs land
-correctly. Every `docker run` snippet in `SKILL.md` includes this
-flag; verify your shell history did not drop it.
+Then rerun with the `-u` flag.
 
-**Aspect-ratio distortion in output**
+**Frames appear out of temporal order**
 
-Inputs are force-resized to 1024×576 and restored to the original
-resolution after the model runs. For non-16:9 content (4:3, 1:1,
-portrait), the model still improves perceptual quality and temporal
-coherence, but pixel-exact fidelity can suffer. There is no
-user-facing flag to change the internal resolution — the JIT models
-were traced at 1024×576.
+The standard inference helper sorts paths as strings. Names like
+`frame_10.png` sort before `frame_2.png`. Use fixed-width zero-padded
+names such as `frame_000010.png`.
 
-**Output count does not match input count**
+**CUDA out of memory**
 
-Confirm all inputs end in `.png` or `.jpg`. Remove any hidden
-`.DS_Store`, `Thumbs.db`, or editor backup files. The script skips
-unsupported formats silently.
+Lower `--resolution`, disable speed/export modes, avoid TensorRT compile
+on small GPUs, or move to a larger Ampere/Hopper/Blackwell GPU. Training
+is much heavier than inference and the README command assumes 8 GPUs.
 
-**Fresh instance missing `${HOME}/.cache/nre/difix/`**
+## Evaluation
 
-Only relevant when consuming the harmonizer via NRE. On a fresh Brev
-/ cloud instance, the cache is not pre-populated. Run any NRE
-pipeline with `--enable-difix --difix-cache=${HOME}/.cache/nre/difix`;
-NRE will pull the same NGC harmonizer artifact on first use.
-Alternatively, fetch the artifact directly with
-`ngc registry model download-version "nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer"`
-and point `--difix-cache` at the directory you downloaded into.
+**Evaluation reports missing pairs or zero images**
 
-## Quality
+The test dataset must mirror `render/` and `gt/` exactly:
 
-**Visible seam at frame 5 of a sequence**
+```text
+{scene}/render/{camera}/{timestamp}.png
+{scene}/gt/{camera}/{timestamp}.png
+```
 
-Expected — the first 4 frames go through `harmonizer_nontemporal.pt`
-to warm up the temporal reference window; frame 5 onward switches to
-`harmonizer_temporal.pt`. Either discard the warm-up frames, or
-prepend copies of the first frame and drop those copies on output.
+Every render file needs a matching ground-truth file with the same
+camera subdirectory and filename.
 
-**Quality regresses on a re-run**
+**`metrics.yaml` is missing**
 
-You re-ran into a non-empty `output_dir`. The temporal pass uses the
-previous 4 *output* frames as references, so stale outputs poison the
-window. Always start from an empty output directory.
+Check that `evaluate_test_dataset.py` completed without exceptions and
+that the output path is writable by the container user. The documented
+evaluation command mounts the test dataset read-write because the
+released script writes `evaluation/` and `metrics.yaml` next to the
+input structure. Keep `-u $(id -u):$(id -g)` so those outputs are owned
+by the host user.
 
-**PSNR regresses after harmonization**
+## Training
 
-The harmonizer optimises perceptual quality (LPIPS) over pixel-exact
-fidelity (PSNR), inheriting the Difix3D+ training objective. A small
-PSNR drop paired with a larger LPIPS improvement is expected. If PSNR
-drops dramatically (> 2 dB) on real reconstruction outputs, the render
-domain likely differs from the pretraining distribution — fine-tuning
-the harmonizer on in-domain data is not covered by this external
-skill.
+**Training exits before loading data**
 
-**Grid-like artifacts in output**
+Confirm the JSON manifest contains `train` and `test` keys and each item
+has `image`, `target_image`, and `prompt`. Paths must be visible inside
+the container, not just on the host.
 
-Known beta failure mode on some render domains. The unified beta
-release does not expose a tunable diffusion timestep flag (the JIT
-models bake the schedule in), so the documented mitigations are:
-verify input filenames truly natural-sort, verify
-`harmonizer_temporal.pt` is being used after the warm-up window
-(`grep -i temporal` the script's stderr), and report the failure on
-the NGC model card so the next release can address it.
+**Training is unstable or too slow**
 
-## Filenames
+Start from the release README defaults: learning rate `2e-5`, timestep
+`250`, `resize_576x1024`, `lambda_lpips 0.3`, bf16 mixed precision, and
+`--pretrained_path` when fine-tuning. For the released dataset, add
+`--fixing_data_weight 3` to up-weight artifact-correction pairs.
 
-**`frame_1.png ... frame_10.png` ordering**
+## Secrets
 
-Lexicographic (default) sort places `frame_10.png` **before**
-`frame_2.png`, which silently misorders the temporal references. Use
-zero-padded fixed-width indices (`frame_0001.png ... frame_0010.png`)
-or pre-sort with the natural-sort key documented in the upstream
-inference script. The harmonizer reads the *previous 4 outputs* as
-references, so misordering compounds quality loss across the entire
-sequence.
+Never check token presence with a command that can print the token value.
+Use the validator or a length-only check:
+
+```bash
+test -n "$HF_TOKEN" && echo "HF_TOKEN: set (${#HF_TOKEN} chars)" || echo "HF_TOKEN: missing"
+```
+
+Rotate any token that was echoed into logs or committed to disk.

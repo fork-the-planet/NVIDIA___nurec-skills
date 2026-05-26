@@ -1,35 +1,23 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""Validate that the host meets the prerequisites for nurec-fixer.
+"""Validate host prerequisites for the DiffusionHarmonizer skill.
 
-Checks performed (no network calls):
-  1. `docker` is on PATH.
-  2. NVIDIA Container Toolkit is available (`nvidia-container-cli` on PATH
-     OR `docker info` reports an `nvidia` runtime).
-  3. `nvidia-smi` reports at least one GPU and a compute capability >= 8.0
-     (Ampere or newer).
-  4. `NGC_API_KEY` environment variable is set.
-  5. `ngc` CLI is on PATH (used to download the harmonizer artifact).
-  6. At least 30 GB of free disk space in the current working directory.
+Checks performed without network calls:
+  1. docker is on PATH.
+  2. NVIDIA Container Toolkit is available.
+  3. nvidia-smi reports at least one GPU with compute capability >= 8.0.
+  4. git is on PATH for cloning https://github.com/NVIDIA/harmonizer.
+  5. Hugging Face CLI is available.
+  6. HF_TOKEN is set without echoing its value.
+  7. Optional NGC_API_KEY presence is reported for nvcr.io pulls.
+  8. At least 120 GB of free disk space is available in the cwd.
 
 Usage:
     python scripts/validate_setup.py [--strict]
 
 Arguments:
-    --strict    Treat warnings (e.g. NGC_API_KEY missing, ngc CLI absent)
-                as errors.
-
-Environment variables:
-    NGC_API_KEY    Required (warning only without --strict). NGC personal
-                   API key. Used for `docker login nvcr.io` and for
-                   `ngc registry model download-version`.
-                   Create at: https://ngc.nvidia.com/setup/personal-keys
-
-Exit codes:
-    0 - all prerequisites met
-    1 - one or more prerequisites failed (details on stderr)
-    2 - unexpected error (e.g. subprocess crash)
+    --strict    Treat token/tool warnings as errors.
 """
 from __future__ import annotations
 
@@ -40,9 +28,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 MIN_COMPUTE_CAPABILITY = (8, 0)
-MIN_FREE_DISK_GB = 30
+MIN_FREE_DISK_GB = 120
 
 
 def _err(msg: str) -> None:
@@ -57,12 +44,19 @@ def _ok(msg: str) -> None:
     print(f"[ OK ] {msg}")
 
 
-def check_docker() -> bool:
-    if shutil.which("docker") is None:
-        _err("docker not on PATH — install Docker from https://docs.docker.com/engine/install/")
+def check_executable(name: str, install_hint: str, strict: bool = True) -> bool:
+    if shutil.which(name) is not None:
+        _ok(f"{name} found")
+        return True
+    if strict:
+        _err(f"{name} not on PATH - {install_hint}")
         return False
-    _ok("docker found")
+    _warn(f"{name} not on PATH - {install_hint}")
     return True
+
+
+def check_docker() -> bool:
+    return check_executable("docker", "install Docker from https://docs.docker.com/engine/install/")
 
 
 def check_nvidia_runtime() -> bool:
@@ -84,7 +78,7 @@ def check_nvidia_runtime() -> bool:
         _ok("nvidia runtime reported by `docker info`")
         return True
     _err(
-        "NVIDIA Container Toolkit not detected — install from "
+        "NVIDIA Container Toolkit not detected - install from "
         "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html"
     )
     return False
@@ -92,7 +86,7 @@ def check_nvidia_runtime() -> bool:
 
 def check_gpu() -> bool:
     if shutil.which("nvidia-smi") is None:
-        _err("nvidia-smi not on PATH — is an NVIDIA driver installed?")
+        _err("nvidia-smi not on PATH - is an NVIDIA driver installed?")
         return False
     try:
         out = subprocess.run(
@@ -113,7 +107,8 @@ def check_gpu() -> bool:
     if not lines:
         _err("nvidia-smi reported no GPUs")
         return False
-    bad = []
+
+    bad: list[str] = []
     for line in lines:
         name, _, cc_str = line.partition(",")
         cc_str = cc_str.strip()
@@ -128,24 +123,19 @@ def check_gpu() -> bool:
         else:
             _ok(f"{name.strip()} sm_{cc[0]}{cc[1]} meets minimum sm_80")
     if bad:
-        _err(
-            "GPU(s) below minimum compute capability 8.0 (Ampere): "
-            + ", ".join(bad)
-        )
+        _err("GPU(s) below minimum compute capability 8.0 (Ampere): " + ", ".join(bad))
         return False
     return True
 
 
-def check_ngc_api_key(strict: bool) -> bool:
-    if os.environ.get("NGC_API_KEY"):
-        _ok("NGC_API_KEY is set")
+def check_hf_cli(strict: bool) -> bool:
+    if shutil.which("hf") is not None:
+        _ok("hf CLI found")
         return True
-    msg = (
-        "NGC_API_KEY environment variable not set — required to pull "
-        "nvcr.io/nvidia/pytorch:24.10-py3 and to download the harmonizer "
-        "artifact nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer. "
-        "Create at https://ngc.nvidia.com/setup/personal-keys"
-    )
+    if shutil.which("huggingface-cli") is not None:
+        _ok("huggingface-cli found")
+        return True
+    msg = 'Hugging Face CLI not on PATH - install with `python3 -m pip install --user "huggingface_hub[cli]"`'
     if strict:
         _err(msg)
         return False
@@ -153,15 +143,12 @@ def check_ngc_api_key(strict: bool) -> bool:
     return True
 
 
-def check_ngc_cli(strict: bool) -> bool:
-    if shutil.which("ngc") is not None:
-        _ok("ngc CLI found")
+def check_env_token(name: str, purpose: str, strict: bool) -> bool:
+    value = os.environ.get(name)
+    if value:
+        _ok(f"{name} is set ({len(value)} chars)")
         return True
-    msg = (
-        "ngc CLI not on PATH — install per "
-        "https://docs.ngc.nvidia.com/cli/ to download the harmonizer "
-        "artifact via `ngc registry model download-version`."
-    )
+    msg = f"{name} is not set - {purpose}"
     if strict:
         _err(msg)
         return False
@@ -176,9 +163,9 @@ def check_disk_space() -> bool:
     except OSError as exc:
         _err(f"could not check free disk: {exc}")
         return False
-    free_gb = free_bytes / (1024 ** 3)
+    free_gb = free_bytes / (1024**3)
     if free_gb < MIN_FREE_DISK_GB:
-        _err(f"only {free_gb:.1f} GB free in {cwd}; need >= {MIN_FREE_DISK_GB} GB")
+        _err(f"only {free_gb:.1f} GB free in {cwd}; recommend >= {MIN_FREE_DISK_GB} GB")
         return False
     _ok(f"{free_gb:.1f} GB free in {cwd}")
     return True
@@ -193,15 +180,31 @@ def main() -> int:
         ("docker", check_docker()),
         ("nvidia-container-toolkit", check_nvidia_runtime()),
         ("gpu", check_gpu()),
-        ("ngc-api-key", check_ngc_api_key(args.strict)),
-        ("ngc-cli", check_ngc_cli(args.strict)),
+        ("git", check_executable("git", "install git", strict=True)),
+        ("hf-cli", check_hf_cli(args.strict)),
+        (
+            "hf-token",
+            check_env_token(
+                "HF_TOKEN",
+                "required to download nvidia/DiffusionHarmonizer and optional dataset artifacts",
+                args.strict,
+            ),
+        ),
+        (
+            "ngc-api-key",
+            check_env_token(
+                "NGC_API_KEY",
+                "often required for `docker login nvcr.io` before pulling NVIDIA containers",
+                strict=False,
+            ),
+        ),
         ("disk-space", check_disk_space()),
     ]
     failed = [name for name, ok in checks if not ok]
     if failed:
         print(f"\nFAILED: {', '.join(failed)}", file=sys.stderr)
         return 1
-    print("\nAll prerequisites met.")
+    print("\nPrerequisite check completed.")
     return 0
 
 

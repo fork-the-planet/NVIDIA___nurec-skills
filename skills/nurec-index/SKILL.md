@@ -73,10 +73,10 @@ already on disk](#find-a-skill-that-isnt-already-on-disk).
 > coordination layers. The canonical sources live upstream — NCore
 > (<https://github.com/NVIDIA/ncore>), the NRE NGC containers
 > (`nvcr.io/nvidia/nre/nre`, `nvcr.io/nvidia/nre/nre-tools`), Asset
-> Harvester (<https://github.com/NVIDIA/asset-harvester>), the unified
-> Fixer & Harmonizer
-> (<https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nre/models/nurec-fixer>),
-> and the `PhysicalAI-*` Hugging Face datasets under
+> Harvester (<https://github.com/NVIDIA/asset-harvester>),
+> DiffusionHarmonizer (<https://github.com/NVIDIA/harmonizer> and
+> <https://huggingface.co/nvidia/DiffusionHarmonizer>), and the
+> `PhysicalAI-*` Hugging Face datasets under
 > <https://huggingface.co/nvidia>. Each
 > sibling skill links its upstream in its frontmatter
 > `metadata.upstream` field.
@@ -133,7 +133,7 @@ right. Arrows mean "do these in order".
 | Skip training and use a pre-built indoor robotics scene | `physical-ai-datasets` → `nre` (then Isaac Sim 5.1) |
 | Extract individual 3D objects (cars, pedestrians) from a driving clip | `asset-harvester` |
 | Add, remove, or replace cars / pedestrians in a NuRec scene | `asset-harvester` → `nre` |
-| Clean up rendered frames (remove ghosting, floaters, flickering) | `nurec-fixer`, **or** turn on `--enable-difix` inside `nre` |
+| Clean up or harmonize rendered frames (ghosting, floaters, flickering, inserted-object lighting / shadows) | `nurec-fixer`, **or** turn on `--enable-difix` inside `nre` for inline NRE rendering |
 | Export the scene as a PLY, mesh, depth maps, ego mask, etc. | `nre` |
 | Upgrade an old USDZ so newer NRE versions load it faster | `nre` (`upgrade-artifact`) |
 | Open a USDZ or PLY in a browser viewer | `nre` (`viewer` / `ply_viewer`) |
@@ -199,15 +199,17 @@ training anything themselves.
 ### E. Clean up rendered frames
 
 NuRec sometimes leaves visible artifacts (floating dots, ghosting,
-flickering between frames). Two ways to fix this — pick one:
+flickering between frames) or object-insertion mismatches (lighting,
+shadows, color). Two ways to fix this — pick one:
 
 - **Quick path** — turn on `--enable-difix` when you start the gRPC
-  server in `nre`. NRE has a small "Fixer" model built in and runs
-  it on every frame as it renders. Default for most users.
+  server in `nre`. NRE owns this inline rendering integration. Default
+  for users who are already rendering through NRE.
 - **Standalone path** — render frames first with `nre`, then run
-  `nurec-fixer` on the folder of frames. Use this when you want to
-  try different Fixer model variants, or fix frames that were
-  rendered earlier without re-running NRE.
+  `nurec-fixer` on the folder of frames. Use this when you want the
+  public DiffusionHarmonizer code/model card, paired evaluation,
+  fine-tuning, or fixes for frames that were rendered earlier without
+  re-running NRE.
 
 ### F. Benchmark reconstruction quality
 
@@ -246,7 +248,7 @@ just where the skill lives in this repo if you've cloned it locally.
 | `ncore` | `ncore/` | Converts any sensor recording into NCore V4, the format NRE needs. Also covers writing a new converter. | NRE refuses to load anything that isn't valid NCore V4, so this comes before training. |
 | `nre` | `nre/` | The Neural Reconstruction Engine itself. Trains reconstructions, renders frames, exports meshes / point clouds / depth, edits actors, runs the gRPC server, browses the result in a viewer, evaluates quality. | The "actually do something with NuRec" skill. Read after the data is ready. |
 | `asset-harvester` | `asset-harvester/` | Open-source pipeline (Apache-2.0) that extracts individual 3D objects from sparse views in a driving clip and saves them as `.ply` Gaussian splats with metadata. | Only needed for the "add / remove / replace objects" workflow (D above). |
-| `nurec-fixer` | `nurec-fixer/` | Standalone "Fixer" model (built on Difix3D+) that cleans up rendered frames in a separate step from rendering. | Only needed when the built-in `--enable-difix` inside `nre` isn't enough or when you're fixing frames that were rendered earlier. |
+| `nurec-fixer` | `nurec-fixer/` | Standalone DiffusionHarmonizer workflow that cleans up rendered frames, harmonizes inserted actors, evaluates PSNR/LPIPS, and optionally fine-tunes the model. | Use when the built-in `--enable-difix` inside `nre` is not the right interface, or when you need the public HF/GitHub harmonizer workflow. |
 
 ## Easy mix-ups
 
@@ -255,19 +257,13 @@ come back here.
 
 - **NuRec vs NRE.** NuRec is the product name; NRE is the engine
   inside it. Both map to the same skill: `nre`.
-- **NRE's built-in Fixer vs the standalone Fixer.** Both are based
-  on the **Difix3D+** model family (paper:
-  <https://arxiv.org/abs/2503.01774>), but they're packaged
-  differently. `nre`'s `--enable-difix` flag runs a built-in Fixer
-  variant (`cosmos_difix` by default since 25.09, or `sd_difix` for
-  the legacy Stable-Diffusion build) inside the NRE container as
-  it renders. The `nurec-fixer` skill is the standalone unified
-  Fixer & Harmonizer release on NGC
-  (`nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer`) that runs
-  inside the public `pytorch:24.10-py3` base image on a folder of
-  already-rendered frames. Default to the built-in one; reach for
-  `nurec-fixer` when you want to swap model variants or fix frames
-  that were rendered earlier.
+- **NRE's built-in Fixer vs standalone DiffusionHarmonizer.** `nre`'s
+  `--enable-difix` flag is an inline NRE rendering feature. The
+  `nurec-fixer` skill now covers the standalone public
+  DiffusionHarmonizer release (code at `NVIDIA/harmonizer`, model at
+  `nvidia/DiffusionHarmonizer`) for frames already on disk, paired
+  evaluation, and fine-tuning. Do not assume these two paths share
+  cache layout or weights unless the NRE tag's own docs say so.
 - **`ncore` vs `nre`.** They run **in order**, never as alternatives.
   `ncore` produces the input format; `nre` reads it.
 - **`asset-harvester` vs `nre`'s `export-external-assets`.** Asset
@@ -292,7 +288,7 @@ need the workflow:
 | Sibling skill | What to read | Approximate footprint |
 |---------------|--------------|------------------------|
 | `nre` | [Teardown](nre/SKILL.md#teardown) + [`references/teardown.md`](nre/_versions/release_26.04/85ba2e2/references/teardown.md) | ~120 GB images + caches + per-run outputs |
-| `nurec-fixer` | [Teardown](nurec-fixer/SKILL.md#teardown) + [`references/teardown.md`](nurec-fixer/_versions/main/617a990/references/teardown.md) | ~30 GB image + harmonizer artifact + outputs |
+| `nurec-fixer` | [Teardown](nurec-fixer/SKILL.md#teardown) + [`references/teardown.md`](nurec-fixer/_versions/main/617a990/references/teardown.md) | 100 GB+ possible between Cosmos image/build cache, HF model/dataset, checkout, and outputs |
 | `asset-harvester` | [Teardown](asset-harvester/SKILL.md#teardown) | ~30 GB conda envs + checkpoints + outputs |
 | `ncore` | NCore shards live under `<dataset_dir>/`; delete after you're done with NRE training | clip-dependent |
 | `physical-ai-datasets` | HF caches live under `${HF_HOME:-$HOME/.cache/huggingface}/hub/`; remove per-dataset directories | dataset-dependent |
@@ -387,7 +383,7 @@ This index is read-only — it doesn't itself need any tooling. The
 | `ncore` | Python 3.10+, `pip install nvidia-ncore`; source data on disk |
 | `nre` | Linux x86_64, NVIDIA GPU (Ampere+, ≥24 GB VRAM), Docker 23+, NVIDIA Container Toolkit, NGC_API_KEY |
 | `asset-harvester` | Linux + conda, NVIDIA driver ≥570, ~16 GB VRAM, HF_TOKEN |
-| `nurec-fixer` | Linux, NVIDIA GPU (Ampere+), Docker, NGC_API_KEY, `ngc` CLI |
+| `nurec-fixer` | Linux, NVIDIA GPU (Ampere+), Docker, NVIDIA Container Toolkit, HF_TOKEN; NGC_API_KEY may be needed for `nvcr.io` container pulls |
 | `physical-ai-datasets` | Python + `huggingface_hub`, HF_TOKEN (gated datasets need license acceptance) |
 
 Each sibling skill ships `scripts/validate_setup.py` (where

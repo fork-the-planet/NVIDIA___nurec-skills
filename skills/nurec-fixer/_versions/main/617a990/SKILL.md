@@ -1,24 +1,25 @@
 ---
 name: nurec-fixer
 description: >-
-  Use when the user wants to enhance, harmonize, or temporally
-  stabilize novel-view renders from a 3D reconstruction (especially
-  NRE / NuRec outputs) by running NVIDIA's unified Fixer & Harmonizer
-  — a JIT TorchScript model (Difix3D+ lineage) shipped on NGC at
-  `nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer` that removes
-  artifacts and harmonizes appearance in underconstrained regions.
-  Covers fetching the artifact (inference script +
-  `harmonizer_temporal.pt` + `harmonizer_nontemporal.pt`) from NGC,
-  running per-sequence inference inside
-  `nvcr.io/nvidia/pytorch:24.10-py3`, and consuming the same weights
-  via `nre --enable-difix`. Post-processing only; do NOT use to
-  retrain a reconstruction or as a general image super-resolution
-  model. Trigger keywords: nurec fixer, nurec harmonizer, nvidia
-  fixer, unified fixer harmonizer, cosmos_3dgut_fixer_harmonizer,
-  harmonizer_temporal.pt, harmonizer_nontemporal.pt,
-  inference_jit_harmonizer.py, difix, difix3d+, fix rendered frames,
-  temporal stabilization, --enable-difix.
-version: "0.3.0"
+  Use when the user wants to enhance, harmonize, evaluate, or fine-tune
+  rendered novel-view images from neural reconstructions by running
+  NVIDIA DiffusionHarmonizer, the public successor to the older Fixer
+  recipes. Covers cloning the public NVIDIA/harmonizer code, building
+  the Cosmos Predict2 environment, downloading the Hugging Face model
+  `nvidia/DiffusionHarmonizer` to obtain
+  `models/pretrained/pretrained_harmonizer.pkl`, running inference with
+  `src/inference_pretrained_model.py`, preparing paired train/test data,
+  evaluating PSNR/LPIPS with `evaluate_test_dataset.py`, and optional
+  fine-tuning. Do NOT use for training the 3D reconstruction itself
+  (use `nre`) or for converting sensor data (use `ncore`). Trigger
+  keywords: nurec fixer, nurec harmonizer, diffusion harmonizer,
+  DiffusionHarmonizer, NVIDIA Harmonizer, nvidia/DiffusionHarmonizer,
+  pretrained_harmonizer.pkl, harmonizer-cosmos-env,
+  cosmos-predict2-container, inference_pretrained_model.py,
+  train_pix2pix_turbo_harmonizer.py, evaluate_test_dataset.py,
+  harmonize rendered frames, fix reconstruction artifacts, online
+  diffusion enhancer, inserted object harmonization, PSNR, LPIPS.
+version: "0.4.0"
 tools:
   - Shell
   - Read
@@ -27,515 +28,563 @@ license: CC-BY-4.0 AND Apache-2.0
 compatibility: >-
   Linux host with an NVIDIA GPU of Ampere architecture or newer
   (compute capability >= 8.0; A100, A10, L40, H100, RTX 30/40/PRO,
-  B200, GB200). Recent NVIDIA driver supporting CUDA 12, NVIDIA
-  Container Toolkit, Docker (or Podman). ~16 GB VRAM at 1024x576.
-  Internet egress to nvcr.io and ngc.nvidia.com. Credentials via env
-  vars only: NGC_API_KEY (required for both the model artifact and the
-  pytorch base image pull).
+  B200, GB200). Docker with NVIDIA Container Toolkit. Public code from
+  https://github.com/NVIDIA/harmonizer, public model weights from
+  https://huggingface.co/nvidia/DiffusionHarmonizer, and optional
+  dataset from https://huggingface.co/datasets/nvidia/DiffusionHarmonizer-Dataset.
+  The documented runtime uses the Cosmos Predict2 container
+  `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2` or the
+  project Dockerfile that layers the required packages and patches.
 dependencies:
   - bash
   - docker
   - nvidia-container-toolkit
   - python3
-  - ngc-cli
+  - git
+  - huggingface_hub
 metadata:
   author: NVIDIA NuRec
   tags:
     - nurec
     - fixer
     - harmonizer
+    - diffusionharmonizer
     - reconstruction
     - autonomous-vehicles
     - post-processing
-  ngc_model: nvcr.io/nvidia/nre/nurec-fixer
-  ngc_model_version: cosmos_3dgut_fixer_harmonizer
-  ngc_model_page: https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nre/models/nurec-fixer?version=cosmos_3dgut_fixer_harmonizer
-  ngc_container: nvcr.io/nvidia/pytorch:24.10-py3
-  release_status: beta
-  paper: https://arxiv.org/abs/2503.01774
-  product_page: https://research.nvidia.com/labs/toronto-ai/difix3d/
+    - evaluation
+  upstream: https://github.com/NVIDIA/harmonizer
+  hf_model: https://huggingface.co/nvidia/DiffusionHarmonizer
+  hf_dataset: https://huggingface.co/datasets/nvidia/DiffusionHarmonizer-Dataset
+  container: nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
+  paper: https://arxiv.org/abs/2602.24096
+  product_page: https://research.nvidia.com/labs/sil/projects/diffusion-harmonizer/
+  model_license: NVIDIA Open Model License Agreement
+  source_branches_checked:
+    - alex/harmonizner@54596de
+    - lesliem/harmonizer/update-model-card@2422370
+    - lesliem/harmonizer/fix-inconsistencies@3616343
 ---
 
-# NVIDIA Unified Fixer & Harmonizer (NuRec Post-Processing)
+# NVIDIA DiffusionHarmonizer (NuRec Post-Processing)
 
 ## Purpose
 
-Run NVIDIA's unified Fixer & Harmonizer JIT TorchScript model
-(Difix3D+ lineage) on novel-view renders from a 3D reconstruction to
-remove artifacts (ghosting, floaters, splotches) and harmonize
-appearance in underconstrained regions. Either standalone via
-`inference_jit_harmonizer.py` inside `nvcr.io/nvidia/pytorch:24.10-py3`
-or through `nre --enable-difix` during NRE rendering.
+Run NVIDIA DiffusionHarmonizer on rendered images from neural
+reconstructions. DiffusionHarmonizer is a single-step, temporally-aware
+image diffusion enhancer for NeRF / 3DGS / NuRec-style renderings. It
+improves realism, reduces reconstruction artifacts, and harmonizes
+inserted dynamic objects with the surrounding scene.
 
-**Use this skill when:** the user has rendered frames from NRE or
-another 3D reconstruction pipeline and wants to clean them up before
-downstream consumption (training data, qualitative review, sensor
-sim, etc.).
+**Use this skill when:** the user has rendered frames from NRE, NuRec,
+3D Gaussian Splatting, NeRF, or a similar reconstruction pipeline and
+wants to enhance, harmonize, evaluate, or optionally fine-tune the
+DiffusionHarmonizer model.
 
 **Do NOT use this skill when:**
 
-- The user wants to retrain or fine-tune the reconstruction itself
-  (the Fixer is inference-only post-processing).
-- The user wants a general image super-resolution / denoiser — Fixer
-  is tuned for 3D-reconstruction artifacts, not arbitrary photos.
-- No NGC API key is available — both the model and the base image
-  live behind NGC auth.
+- The user wants to train or render the 3D reconstruction itself. Use
+  the sibling `nre` skill.
+- The user wants to convert raw sensor data to NCore V4. Use `ncore`.
+- The user wants a generic photo enhancer. DiffusionHarmonizer is tuned
+  for neural-reconstruction artifacts and object-insertion failures.
+- The user only wants NRE inline rendering with `--enable-difix`. That
+  remains an NRE runtime feature; use the `nre` skill for the complete
+  `serve-grpc` / `render-grpc` command shape.
+
+## What Changed From The Older Fixer Skill
+
+This skill now follows the newer DiffusionHarmonizer release branches,
+not the older NGC JIT `.pt` artifact recipe. Use these public release
+artifacts:
+
+- Code: `https://github.com/NVIDIA/harmonizer`
+- Model: `nvidia/DiffusionHarmonizer` on Hugging Face
+- Main checkpoint: `models/pretrained/pretrained_harmonizer.pkl`
+- Runtime: Cosmos Predict2 environment, usually
+  `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2`
+- Inference entry point: `src/inference_pretrained_model.py`
+- Evaluation entry point: `src/evaluate_test_dataset.py`
+- Training entry point: `src/train_pix2pix_turbo_harmonizer.py`
+
+Do not use the obsolete standalone recipe that downloads
+`nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer`, mounts
+`harmonizer_temporal.pt`, or runs `inference_jit_harmonizer.py` inside
+`nvcr.io/nvidia/pytorch:24.10-py3` unless the user explicitly asks for
+that older beta artifact.
 
 ## Background
 
-A single TorchScript JIT model that removes artifacts and harmonizes
-appearance in novel-view renders produced by 3D reconstruction
-pipelines (Gaussian Splatting, NeRF, NRE / NuRec, and similar). The
-unified release replaces the earlier HuggingFace `nvidia/Fixer` V2
-artifact and is published on NGC at
-[`nvidia/nre/nurec-fixer`, version
-`cosmos_3dgut_fixer_harmonizer`](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nre/models/nurec-fixer?version=cosmos_3dgut_fixer_harmonizer).
-Inference runs inside the public PyTorch base image
-[`nvcr.io/nvidia/pytorch:24.10-py3`](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch);
-no custom image build is required.
+DiffusionHarmonizer is described in
+[DiffusionHarmonizer: Bridging Neural Reconstruction and Photorealistic
+Simulation with Online Diffusion Enhancer](https://arxiv.org/abs/2602.24096),
+CVPR 2026. It distills a pretrained multi-step diffusion model into a
+single-step enhancer designed for online simulation and offline data
+cleanup.
 
-> **Beta release.** Flag names, model-file layout, and even the
-> required PyTorch base may shift between minor versions. Pin both the
-> NGC artifact version (`cosmos_3dgut_fixer_harmonizer`) and the base
-> image tag (`24.10-py3`) for reproducibility.
+The release describes two operating modes:
 
-The artifact ships three files plus a `requirements.txt`:
+- **Offline mode:** clean pseudo-training views rendered from a
+  reconstruction, then distill the improved views back into the 3D
+  representation.
+- **Online mode:** enhance frames during simulation/inference by
+  harmonizing color and lighting, reconstructing missing or inconsistent
+  shadows for inserted actors, and reducing residual reconstruction
+  artifacts.
 
-| File | Purpose |
-|------|---------|
-| `inference_jit_harmonizer.py` | Entry point. Iterates an input directory and writes harmonized frames. |
-| `harmonizer_temporal.pt`      | Temporal TorchScript JIT model. Used after the warm-up window (consumes the previous 4 outputs as references). |
-| `harmonizer_nontemporal.pt`   | Nontemporal TorchScript JIT model. Used for the first frames before a temporal window exists. |
-| `requirements.txt`            | Extra Python dependencies installed on top of `pytorch:24.10-py3`. |
-
-## Table of Contents
-
-- [When to Use](#when-to-use) · [Inputs](#inputs) · [Instructions](#instructions) · [Output Format](#output-format)
-- [Prerequisites](#prerequisites) · [Verifying secrets safely](#verifying-secrets-safely)
-- [Container setup](#container-setup) · [File ownership](#file-ownership-must-pin--u-id--u-id--g)
-- [Model download](#model-download) · [Run inference](#run-inference)
-- [Consuming Fixer via NRE](#consuming-fixer-via-nre---enable-difix) · [Scripts](#scripts) · [References](#references)
-- [Limitations](#limitations) · [Troubleshooting](#troubleshooting) · [Teardown](#teardown)
-
-The harmonizer is typically chained **after** a NuRec / NRE
-reconstruction: the reconstruction renders novel views from held-out
-camera poses, and the harmonizer cleans up the rendered frames and
-stabilizes them temporally to improve perceptual quality and downstream
-metrics (LPIPS, PSNR).
-
-## When to Use
-
-- User has a directory of rendered frames from a 3D reconstruction
-  (NRE, NuRec, Gaussian Splatting, NeRF, etc.) and asks to remove
-  artifacts, enhance, harmonize, or "fix" them.
-- User mentions running the NVIDIA Fixer / Harmonizer model, Difix3D+,
-  the NGC model `nvidia/nre/nurec-fixer`, or the
-  `cosmos_3dgut_fixer_harmonizer` version on novel-view renders.
-- User mentions `--enable-difix` in an NRE pipeline and asks what
-  weights / cache to supply.
-- User mentions `harmonizer_temporal.pt` / `harmonizer_nontemporal.pt`
-  / `inference_jit_harmonizer.py` and wants an end-to-end recipe.
-
-### When NOT to Use
-
-- The user wants to **train or run the 3D reconstruction itself**
-  (e.g. multi-camera NRE reconstruction, Gaussian Splatting training).
-  Use the sibling [`nre`](../nre/SKILL.md) skill instead; the
-  harmonizer only post-processes renders.
-- The user wants the harmonizer **inline with NRE rendering** (single
-  pipeline, no separate container). Use NRE's built-in
-  `--enable-difix` flag with `difix=cosmos_difix` (default since
-  25.09) or `difix=sd_difix` for the legacy Stable-Diffusion variant.
-  Reach for this standalone skill only when you need to swap variants,
-  post-process frames that were rendered earlier, or apply the
-  harmonizer to non-NRE renders.
-- The user wants to train or fine-tune a new harmonizer / fixer model.
-  Fine-tuning requires the internal training codebase and is not
-  covered by this external-facing skill.
-- The user wants to apply the harmonizer to real (non-rendered) camera
-  images — the model is trained specifically on reconstruction
-  artifacts and will distort real photographs.
+The public model card describes `DiffusionHarmonizer-cosmos-0.6B`, a
+Cosmos Predict2 Diffusion Transformer post-trained at `576x1024` input
+and output resolution. It is intended for Physical AI developers working
+on autonomous-vehicle neural-reconstruction simulation.
 
 ## Inputs
 
-- **input_dir** — directory of rendered images (`.png`, `.jpg`) to
-  enhance. Filenames MUST natural-sort into temporal order; the
-  harmonizer reads the **previous 4 outputs** as references after
-  warm-up, so misordered filenames silently degrade temporal coherence.
-  (source: user prompt; required.)
-- **output_dir** — directory for harmonized images. MUST be empty or
-  non-existent — the temporal pass would otherwise reuse stale frames
-  as references. (source: user prompt; required.)
-- **artifact_dir** — host directory holding the unpacked NGC artifact
-  (`inference_jit_harmonizer.py`, `harmonizer_temporal.pt`,
-  `harmonizer_nontemporal.pt`, `requirements.txt`). Defaults to
-  `./nurec-fixer_vcosmos_3dgut_fixer_harmonizer/` after running the
-  download step. (source: user prompt or agent context; required.)
-- **NGC_API_KEY** — NGC personal API key, set as an environment
-  variable on the host (source: agent context; required for both the
-  model download and the base-image pull; create at
-  <https://ngc.nvidia.com/setup/personal-keys>).
+- **code_dir** — checkout of `https://github.com/NVIDIA/harmonizer`.
+- **model_dir** — directory downloaded from Hugging Face. After
+  `hf download nvidia/DiffusionHarmonizer --local-dir models`, the main
+  checkpoint is `models/pretrained/pretrained_harmonizer.pkl`.
+- **input_dir** — directory of rendered RGB frames (`.png`, `.jpg`, or
+  `.jpeg`) to enhance.
+- **output_dir** — directory where enhanced frames are written.
+- **HF_TOKEN** — Hugging Face token with access to the model and, if
+  used, the dataset. Accept the model/dataset license terms before
+  downloading gated artifacts.
+- **NGC_API_KEY** — often needed to authenticate `docker pull` from
+  `nvcr.io`, depending on site policy. Use it only for container pulls,
+  not for model download.
 
 ## Instructions
 
-1. Run [`scripts/validate_setup.py`](scripts/validate_setup.py) to
-   confirm the host has Docker, the NVIDIA Container Toolkit, a GPU
-   with compute capability ≥ 8.0, `NGC_API_KEY` exported, and enough
-   free disk for the base image (~25 GB) plus the harmonizer artifact
-   (~5 GB). Abort on any failure. **Never** verify `NGC_API_KEY` is
-   set by writing ad-hoc bash that substitutes the value (see
-   [Verifying secrets safely](#verifying-secrets-safely)).
-2. Authenticate to NGC and pull the PyTorch base image
-   `nvcr.io/nvidia/pytorch:24.10-py3` if it is not already present
-   (see [Container setup](#container-setup)).
-3. Download the harmonizer artifact from
-   [`nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer`](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nre/models/nurec-fixer?version=cosmos_3dgut_fixer_harmonizer)
-   into a host directory using `ngc registry model download-version`.
-   Verify the four expected files (`inference_jit_harmonizer.py`,
-   `harmonizer_temporal.pt`, `harmonizer_nontemporal.pt`,
-   `requirements.txt`) are present. See [Model download](#model-download).
-4. Confirm `input_dir` exists, contains supported images, that
-   filenames natural-sort into the intended order, and that
-   `output_dir` is empty or non-existent. Fail fast otherwise.
-5. Run the inference container with `input_dir`, `output_dir`, and
-   `artifact_dir` mounted. Install the artifact's `requirements.txt`
-   on top of the base image inside the container, then invoke
-   `inference_jit_harmonizer.py`. **Pin the container UID/GID to the
-   host user with `-u $(id -u):$(id -g)`** so outputs are owned by
-   you, not by root (see [Run inference](#run-inference) and
-   [File ownership](#file-ownership-must-pin--u-id--u-id--g)).
-6. Validate that the number of output images equals the number of
-   input images, spot-check a frame visually, and confirm
-   `ls -l <output_dir>` shows your UID rather than `root`.
-7. When consuming the harmonizer as part of an NRE pipeline, prefer
-   passing `--enable-difix --difix-cache=<path>` to the NRE entrypoint
-   instead of running the harmonizer manually — NRE will pull the same
-   NGC artifact into the cache directory and call the model
-   internally.
-8. When done, follow [Teardown](#teardown) to reclaim the ~30 GB of
-   images, weights, and outputs the workflow leaves behind.
+1. Run `python scripts/validate_setup.py` from this skill to check
+   Docker, NVIDIA Container Toolkit, GPU architecture, `git`,
+   Hugging Face CLI availability, token presence, and disk space.
+2. Clone the public code and build the runtime image:
 
-## Output Format
+   ```bash
+   git clone https://github.com/NVIDIA/harmonizer.git
+   cd harmonizer
+   docker build -t harmonizer-cosmos-env -f Dockerfile.cosmos .
+   ```
 
-Per-frame harmonized images land in `output_dir` with the same
-basenames and file extensions as the inputs:
+   If using the raw Cosmos Predict2 container instead of the project
+   image, pin `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2` and
+   apply the project patches documented below.
+3. Download the pretrained model:
 
-```text
-<output_dir>/
-├── <frame-0>.png        # or .jpg, matching input
-├── <frame-1>.png
-└── ...
-```
+   ```bash
+   export HF_TOKEN=<your-hugging-face-token>
+   hf auth login --token "$HF_TOKEN"
+   hf download nvidia/DiffusionHarmonizer --local-dir models
+   ```
 
-Images are restored to each input's original `(width, height)` after
-the model runs at its internal 1024×576 working resolution.
+   Verify `models/pretrained/pretrained_harmonizer.pkl` exists before
+   running inference.
+4. Confirm `input_dir` exists and filenames sort into the intended
+   frame order. The current public inference script uses normal string
+   sorting, so prefer zero-padded frame names such as `frame_000001.png`.
+5. Run inference inside the container with input, output, and model
+   paths mounted. Pin `-u $(id -u):$(id -g)` so outputs are owned by
+   the host user.
+6. Validate that the output frame count matches the input frame count,
+   spot-check frames visually, and optionally run paired evaluation
+   with PSNR/LPIPS if ground truth is available.
+7. If the user wants to train or fine-tune the harmonizer, download the
+   dataset or prepare JSON manifests in the documented format, then run
+   `src/train_pix2pix_turbo_harmonizer.py` with the recommended
+   hyperparameters.
+8. Follow `references/teardown.md` when the workflow is done to remove
+   images, code clones, model weights, datasets, and outputs.
 
-## Prerequisites
+## Container Setup
 
-- Linux host with NVIDIA driver supporting CUDA 12.x.
-- Docker (or Podman) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-- NVIDIA GPU with compute capability ≥ 8.0 (Ampere or newer).
-  ~16 GB VRAM recommended.
-- Internet egress to `nvcr.io` and `ngc.nvidia.com`.
-- NGC personal API key exported as `NGC_API_KEY`. Create at
-  <https://ngc.nvidia.com/setup/personal-keys>. The same key is used
-  for `docker login nvcr.io` (username `$oauthtoken`, password
-  `$NGC_API_KEY`) and for `ngc registry model download-version`.
-- [`ngc` CLI](https://docs.ngc.nvidia.com/cli/) on PATH for downloading
-  the harmonizer artifact. Tested with NGC CLI 3.x.
-- ~30 GB free disk: ~25 GB for `pytorch:24.10-py3`, ~5 GB for the
-  harmonizer artifact and per-run pip cache, plus output room.
-
-### Verifying secrets safely
-
-**Always validate prerequisites by running
-[`scripts/validate_setup.py`](scripts/validate_setup.py).** Never write
-ad-hoc bash that interpolates `NGC_API_KEY` values into stdout. In
-particular, the common one-liner
+The release branches document the Cosmos Predict2 environment. The
+preferred external path is to clone the public code and build the image
+from its `Dockerfile.cosmos`:
 
 ```bash
-# BAD — leaks the secret to the terminal when the variable is set
-echo "NGC_API_KEY: ${NGC_API_KEY:+yes}${NGC_API_KEY:-no}"
+CODE_DIR=$PWD/harmonizer
+git clone https://github.com/NVIDIA/harmonizer.git "$CODE_DIR"
+cd "$CODE_DIR"
+
+docker build \
+  -t harmonizer-cosmos-env \
+  -f Dockerfile.cosmos \
+  .
 ```
 
-prints `yes<key-value>` whenever `NGC_API_KEY` is set, because
-`${VAR:-no}` falls back to "no" only when `VAR` is empty — when set, it
-expands to `$VAR`. The validator uses presence-only checks
-(`os.environ.get("NGC_API_KEY") is not None`) that never echo the
-value. If you must check in a shell, use a length check instead:
+If the project Dockerfile is unavailable in a particular release
+checkout, run from the pinned public Cosmos Predict2 image and install
+only the packages listed by that checkout:
 
 ```bash
-# OK — prints "set (N chars)" or "missing", never the value
-test -n "$NGC_API_KEY" && echo "NGC_API_KEY: set (${#NGC_API_KEY} chars)" || echo "NGC_API_KEY: missing"
+BASE=nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
+
+docker run --gpus=all --rm -it --ipc=host \
+  -u "$(id -u):$(id -g)" \
+  -v "$CODE_DIR":/work \
+  -w /work \
+  "$BASE" \
+  bash
 ```
 
-Rotate any key you suspect may have been echoed.
-
-## Container setup
-
-The unified harmonizer runs inside the unmodified
-`nvcr.io/nvidia/pytorch:24.10-py3` base; there is no custom image
-build (this is a deliberate simplification compared to the older
-`Dockerfile.cosmos` recipe used for the V2 HF artifact).
-
-### Pull the PyTorch base image
+For Blackwell GPUs such as B200 or GB200, the README branch calls out a
+Text2ImageDIT patch before inference when using the raw container:
 
 ```bash
-BASE=nvcr.io/nvidia/pytorch:24.10-py3
-
-# `docker login` once per host. Username MUST be the literal string
-# `$oauthtoken`; the password is your NGC personal API key.
-echo "$NGC_API_KEY" | docker login nvcr.io --username '$oauthtoken' --password-stdin
-
-docker image inspect "$BASE" >/dev/null 2>&1 || docker pull "$BASE"
+patch /usr/local/lib/python3.12/dist-packages/cosmos_predict2/models/text2image_dit.py text2image_dit.patch
 ```
 
-This base ships PyTorch 2.x and the CUDA / cuDNN stack the harmonizer
-needs to load `harmonizer_*.pt` TorchScript JIT modules.
-
-If a site policy requires a mirrored / hardened variant of the
-container, consult your NGC account and substitute the base tag — but
-**do not** pin to `:latest`; pin to the dated tag shown above for
-reproducibility.
-
-### File ownership: MUST pin `-u $(id -u):$(id -g)`
-
-By default, processes inside an `nvcr.io` container run as `root`.
-Any file the container writes to a host bind mount lands on the host
-as `root:root 644` — which means the host user cannot `mv`, `chmod`,
-`cp`, or `rm` the output without `sudo`. Every documented `docker
-run` snippet below threads `-u $(id -u):$(id -g)` into the container
-so outputs are owned by **your** UID/GID. Do not drop this flag in
-copy-pasted variants — verify with `ls -l <output_dir>` after every
-run.
-
-## Model download
-
-Export your NGC API key, configure the NGC CLI, then download the
-harmonizer artifact into a host-side directory. The container will
-mount this read-only at inference time:
+For training, apply the tokenizer patch as well if the project image did
+not already apply it:
 
 ```bash
-export NGC_API_KEY=<your-ngc-personal-key>   # create at https://ngc.nvidia.com/setup/personal-keys
-
-# Configure the NGC CLI once per host (org=nvidia, team=nre).
-# The CLI reads $NGC_API_KEY from the environment when --api-key is
-# omitted; it never prints the value back.
-ngc config set --format_type ascii
-
-ngc registry model download-version \
-  "nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer" \
-  --dest .
+patch /usr/local/lib/python3.12/dist-packages/cosmos_predict2/tokenizers/tokenizer.py tokenizer.patch
 ```
 
-After the download completes, the artifact lives in
-`./nurec-fixer_vcosmos_3dgut_fixer_harmonizer/`. Verify the four
-expected files exist:
+The project image should bake these patches in. Only apply them manually
+when running directly inside a raw base container.
+
+## Model Download
+
+Install and authenticate the Hugging Face CLI, then download the model:
 
 ```bash
-ARTIFACT_DIR=$(pwd)/nurec-fixer_vcosmos_3dgut_fixer_harmonizer
-ls -lh "$ARTIFACT_DIR"/{inference_jit_harmonizer.py,harmonizer_temporal.pt,harmonizer_nontemporal.pt,requirements.txt}
+python3 -m pip install --user "huggingface_hub[cli]"
+export HF_TOKEN=<your-hugging-face-token>
+hf auth login --token "$HF_TOKEN"
+hf download nvidia/DiffusionHarmonizer --local-dir models
 ```
 
-The two `.pt` checkpoints together are roughly 3 GB. If either file is
-much smaller, the download was truncated — `rm -rf "$ARTIFACT_DIR"` and
-retry. Never commit the checkpoints to version control and never embed
-`NGC_API_KEY` in a config file.
-
-## Run inference
-
-A single `docker run --rm` invocation handles end-to-end inference.
-Bind-mount the artifact directory (read-only), the input frames
-(read-only), and the output directory (read-write); install the
-artifact's `requirements.txt` on top of the base image inside the
-container; then call `inference_jit_harmonizer.py`. Pin the container
-UID/GID to the host user so outputs land owned by you:
+Expected checkpoint:
 
 ```bash
-BASE=nvcr.io/nvidia/pytorch:24.10-py3
-ARTIFACT_DIR=$(pwd)/nurec-fixer_vcosmos_3dgut_fixer_harmonizer
+ls -lh models/pretrained/pretrained_harmonizer.pkl
+```
+
+Never commit `models/`, the downloaded checkpoint, or `HF_TOKEN`.
+
+## Run Inference
+
+Use the public inference entry point from the fixed README branch:
+`src/inference_pretrained_model.py`.
+
+```bash
+IMAGE=harmonizer-cosmos-env
+CODE_DIR=/absolute/path/to/harmonizer
+MODEL_PATH=/work/models/pretrained/pretrained_harmonizer.pkl
 INPUT_DIR=/absolute/path/to/rendered_frames
 OUTPUT_DIR=/absolute/path/to/enhanced_frames
 
 mkdir -p "$OUTPUT_DIR"
-[ -z "$(ls -A "$OUTPUT_DIR" 2>/dev/null)" ] || {
-  echo "ERROR: $OUTPUT_DIR is not empty (temporal pass would reuse stale frames)."
-  exit 1
-}
 
 docker run --gpus=all --rm --ipc=host \
   -u "$(id -u):$(id -g)" \
-  -e PIP_DISABLE_PIP_VERSION_CHECK=1 \
-  -e PYTHONUSERBASE=/tmp/pyuser \
-  -v "$ARTIFACT_DIR":/work:ro \
-  -v "$INPUT_DIR":/in:ro \
-  -v "$OUTPUT_DIR":/out \
+  -v "$CODE_DIR":/work \
+  -v "$INPUT_DIR":/input:ro \
+  -v "$OUTPUT_DIR":/output \
   -w /work \
-  "$BASE" \
-  bash -c '
-    set -euo pipefail
-    pip install --user --no-warn-script-location -r /work/requirements.txt
-    python /work/inference_jit_harmonizer.py \
-      --input_image /in \
-      --output_dir /out \
-      --temporal_model_path /work/harmonizer_temporal.pt \
-      --nontemporal_model_path /work/harmonizer_nontemporal.pt
-  '
+  "$IMAGE" \
+  python /work/src/inference_pretrained_model.py \
+    --model "$MODEL_PATH" \
+    --input /input \
+    --output /output \
+    --timestep 250 \
+    --resolution 1024
 ```
 
-Verify ownership afterwards:
-
-```bash
-ls -l "$OUTPUT_DIR" | head            # first column should be your user, not 'root'
-stat -c '%U:%G' "$OUTPUT_DIR"/*.png | sort -u
-```
-
-Notes:
-
-- The artifact is mounted read-only on `/work`; the script does not
-  write into `$ARTIFACT_DIR` and the only writable path inside the
-  container is `/out` plus the user pip prefix at `/tmp/pyuser`.
-- `--ipc=host` is standard for NGC containers and harmless.
-- The inference script is **single-process, single-GPU**. Do not pass
-  `torchrun` / `--nproc_per_node`.
-- The first run with `-u $(id -u):$(id -g)` may emit harmless
-  warnings about an unknown UID inside the container (no entry in
-  `/etc/passwd`); ignore them.
-- For repeat runs on the same host, the simplest amortization is to
-  bake a small wrapper image that installs `requirements.txt` once.
-  See [`references/wrapper-image.md`](references/wrapper-image.md).
-
-### Inference flags
+Useful flags exposed by the public inference script:
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--input_image` | _(required)_ | Directory of rendered frames inside the container. |
-| `--output_dir` | `output` | Directory for harmonized frames. |
-| `--temporal_model_path` | _(required)_ | Path to `harmonizer_temporal.pt` inside the container. |
-| `--nontemporal_model_path` | _(required)_ | Path to `harmonizer_nontemporal.pt` inside the container. The artifact docs occasionally spell this `--non_temporal_model_path`; both forms appear in the beta tarball — check `python inference_jit_harmonizer.py --help` if either name errors. |
+| `--model` | required | Path to `pretrained_harmonizer.pkl`. |
+| `--input` | required | Directory of input frames. |
+| `--output` | `output` | Directory for enhanced frames. |
+| `--timestep` | script default may differ; README uses `250` | Diffusion timestep used by the distilled model. |
+| `--resolution` | `1024` | Internal size key. `1024` maps to `1024x576`. Other script-supported keys include `960`, `1360`, `704`, `512`, `256`, and `1920`. |
+| `--batch_size` | `8` for benchmarking | Batch size for speed testing. The image generation path currently processes frames one at a time. |
+| `--max_frames` | very large | Maximum number of frames to process. |
+| `--skip_frames` | `1` | Process every Nth frame. |
+| `--save_video` | off | Save an MP4 from the output folder. |
+| `--test-speed` | off | Run the built-in speed benchmark. |
 
-## Consuming Fixer via NRE (`--enable-difix`)
+The branch model card reports H100 testing and an inference time of
+about `212 ms` on one H100. The code also has a local speed-test mode;
+trust the measurement from your target hardware for capacity planning.
 
-If you are already running an NRE reconstruction pipeline from
-`nvcr.io/nvidia/nre/nre:<tag>` (or the GA-channel
-`nvcr.io/nvidia/nre/nre-ga:<tag>`), the cleanest integration is to
-let NRE manage the harmonizer for you. Pass the `--enable-difix`
-flag with a cache directory on the host; NRE will download the same
-NGC artifact into the cache on first run (default
-`${HOME}/.cache/nre/difix/`) and post-process renders internally.
-See the sibling [`nre`](../nre/SKILL.md) skill (`serve-grpc
---enable-difix` invocation in the CLI cookbook) for the full
-pipeline command shape, and pick between `difix=cosmos_difix`
-(default since 25.09) and `difix=sd_difix` (legacy
-Stable-Diffusion variant) at the same time.
+## Temporal Variant
 
-When using this path, you do **not** need to run the steps in
-[Model download](#model-download) or [Run inference](#run-inference)
-above — NRE owns the whole cycle.
+The newer branches also include `src/inference_pix2pix_turbo_harmonizer.py`,
+which runs a temporal/autoregressive variant using prior enhanced frames
+as references. Use it when the user explicitly asks for temporal
+conditioning rather than the standard pretrained model script.
+
+Key differences:
+
+- It accepts `--input_image`, `--model_path`, `--model_identifier`,
+  `--offset_list`, and `--nontemporal`.
+- It writes to a sibling output folder named
+  `<input_dir>_<model_identifier>` instead of taking `--output`.
+- The default `--offset_list -1 -2 -3 -4` uses the four previous
+  enhanced frames as temporal references once enough history exists.
+- Early frames fall back to a non-temporal pass.
+
+Example:
+
+```bash
+docker run --gpus=all --rm --ipc=host \
+  -u "$(id -u):$(id -g)" \
+  -v "$CODE_DIR":/work \
+  -v "$INPUT_DIR":/input:ro \
+  -w /work \
+  harmonizer-cosmos-env \
+  python /work/src/inference_pix2pix_turbo_harmonizer.py \
+    --model_path /work/models/pretrained/pretrained_harmonizer.pkl \
+    --input_image /input \
+    --model_identifier harmonized \
+    --timestep 250
+```
+
+If reproducibility matters, keep each run's output folder separate so
+old temporal outputs cannot be reused accidentally.
+
+## Dataset And Training
+
+The release branches describe a training set of approximately 350K
+curated synthetic-real image pairs from five complementary curation
+pipelines. Download the assembled dataset when the user wants to train,
+fine-tune, or reproduce evaluation:
+
+```bash
+hf download nvidia/DiffusionHarmonizer-Dataset \
+  --repo-type dataset \
+  --local-dir data
+```
+
+Data sources and targeted failure modes:
+
+| Data source | Failure mode |
+|-------------|--------------|
+| ISP Modification | ISP-induced color or tone drift between foreground and background. |
+| Relighting | Illumination mismatch between inserted objects and scene lighting. |
+| Asset Re-insertion | Missing shadows and appearance mismatch when dynamic assets are re-inserted. |
+| PBR Shadow Simulation | Missing or unrealistic cast shadows on inserted objects. |
+| Artifacts Correction | Novel-view artifacts such as blur, missing regions, ghosting, and spurious geometry. |
+
+Training JSON format:
+
+```json
+{
+  "train": {
+    "{data_id}": {
+      "image": "{PATH_TO_IMAGE}",
+      "target_image": "{PATH_TO_TARGET_IMAGE}",
+      "prompt": "remove degradation"
+    }
+  },
+  "test": {
+    "{data_id}": {
+      "image": "{PATH_TO_IMAGE}",
+      "target_image": "{PATH_TO_TARGET_IMAGE}",
+      "prompt": "remove degradation"
+    }
+  }
+}
+```
+
+Recommended multi-GPU training shape from the release README:
+
+```bash
+export NUM_NODES=1
+export NUM_GPUS=8
+export OUTPUT_DIR=/path/to/checkpointing_directory
+export DATASET_FOLDER=/data/data.json
+export WANDB_MODE=offline
+
+accelerate launch \
+  --mixed_precision=bf16 \
+  --main_process_port 29501 \
+  --multi_gpu \
+  --num_machines "$NUM_NODES" \
+  --num_processes "$NUM_GPUS" \
+  src/train_pix2pix_turbo_harmonizer.py \
+    --output_dir="${OUTPUT_DIR}" \
+    --dataset_folder="${DATASET_FOLDER}" \
+    --max_train_steps 10000 \
+    --learning_rate 2e-5 \
+    --train_batch_size=1 \
+    --gradient_accumulation_steps 1 \
+    --dataloader_num_workers 8 \
+    --checkpointing_steps=2000 \
+    --eval_freq 1000 \
+    --viz_freq 1000 \
+    --train_image_prep resize_576x1024 \
+    --test_image_prep resize_576x1024 \
+    --lambda_clipsim 0.0 \
+    --lambda_lpips 0.3 \
+    --lambda_gan 0.0 \
+    --lambda_l2 1.0 \
+    --lambda_gram 0.0 \
+    --use_sched \
+    --report_to wandb \
+    --tracker_project_name cosmos_harmonizer \
+    --tracker_run_name train \
+    --train_full_unet \
+    --timestep 250 \
+    --track_val_fid \
+    --num_samples_eval 20 \
+    --mixed_precision=bf16
+```
+
+For fine-tuning from the released checkpoint, add:
+
+```bash
+--pretrained_path /path/to/pretrained_harmonizer.pkl
+```
+
+For the released dataset, the README recommends `--fixing_data_weight 3`
+to up-weight artifact-correction examples.
+
+## NuRec Data Pair Recipes
+
+The updated tutorials describe four ways to construct image pairs for
+training or testing. Three are shown with NuRec command templates:
+
+- **Sparse reconstruction:** train with every Nth frame and pair held-out
+  ground-truth images with rendered novel views.
+- **Cycle reconstruction:** listed as a supported pair-generation method
+  in the tutorial overview.
+- **Model underfitting:** train a reconstruction for a reduced schedule
+  (roughly 25%-75%) and pair degraded renders with clean targets.
+- **Cross reference:** train using one camera and render/evaluate held-out
+  cameras.
+
+When adapting the sample NRE commands, keep public container names and
+current NRE recipes from the sibling `nre` skill. Do not copy internal
+container names or internal dataset paths into user-facing instructions.
+
+## Evaluation
+
+For quantitative PSNR / LPIPS evaluation, prepare paired data with this
+layout:
+
+```text
+test_dataset/
+├── {scene_id_1}/
+│   ├── render/
+│   │   ├── {camera_id_1}/
+│   │   │   ├── {timestamp_1}.png
+│   │   │   └── {timestamp_2}.png
+│   │   └── {camera_id_2}/
+│   └── gt/
+│       ├── {camera_id_1}/
+│       │   ├── {timestamp_1}.png
+│       │   └── {timestamp_2}.png
+│       └── {camera_id_2}/
+└── {scene_id_2}/
+    ├── render/
+    └── gt/
+```
+
+`render/` and `gt/` must have identical camera subdirectories and
+matching filenames. Images may be PNG, JPEG, or JPG.
+
+Run evaluation:
+
+```bash
+docker run --gpus=all --rm --ipc=host \
+  -u "$(id -u):$(id -g)" \
+  -v "$CODE_DIR":/work \
+  -v /absolute/path/to/test_dataset:/test_dataset \
+  -w /work \
+  harmonizer-cosmos-env \
+  python /work/src/evaluate_test_dataset.py \
+    --model /work/models/pretrained/pretrained_harmonizer.pkl \
+    --input /test_dataset
+```
+
+Expected outputs:
+
+- Enhanced images under an `evaluation/` directory that mirrors the test
+  dataset structure.
+- `metrics.yaml` with overall and per-scene PSNR/LPIPS, inference time,
+  image counts, and GPU memory statistics.
+
+## Consuming Inline Fixer Via NRE
+
+`nre --enable-difix` is still the right answer when the user wants NRE
+to enhance frames as part of rendering without a separate harmonizer
+checkout. That path is owned by the sibling `nre` skill. Do not mix the
+standalone DiffusionHarmonizer HF/Cosmos workflow with NRE's internal
+cache flags unless the NRE documentation for the user's tag explicitly
+says they share weights.
+
+Use this standalone skill when the user wants the public
+DiffusionHarmonizer code, model card, training/evaluation scripts, or
+post-processing of frames that already exist on disk.
 
 ## Scripts
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `scripts/validate_setup.py` | Verify host has Docker, NVIDIA Container Toolkit, a GPU with compute capability ≥ 8.0, `NGC_API_KEY` exported, and sufficient free disk. Makes no network calls. | Execute: `python scripts/validate_setup.py` |
-| `scripts/.env.example`      | Template for `NGC_API_KEY`. Copy to `.env`, fill in, and source before running the workflow.                                   | `cp scripts/.env.example .env && set -a && . ./.env && set +a` |
+| `scripts/validate_setup.py` | Verify Docker, NVIDIA Container Toolkit, GPU architecture, `git`, Hugging Face CLI, token presence, and disk space. Makes no network calls. | `python scripts/validate_setup.py` |
+| `scripts/.env.example` | Template for `HF_TOKEN` and optional `NGC_API_KEY`. | `cp scripts/.env.example .env && set -a && . ./.env && set +a` |
 
 ## References
 
-- [`references/wrapper-image.md`](references/wrapper-image.md) — how
-  to bake a small `Dockerfile` on top of `pytorch:24.10-py3` that
-  pre-installs `requirements.txt` for faster repeat inference.
-- [`references/teardown.md`](references/teardown.md) — full disk
-  reclaim inventory, ownership-recovery commands, and post-teardown
-  verification.
-- [`references/troubleshooting.md`](references/troubleshooting.md)
-  — extended troubleshooting catalogue.
-- Sibling skill — NRE reconstruction and rendering pipeline that
-  produces the inputs the harmonizer post-processes:
-  [`../nre/SKILL.md`](../nre/SKILL.md).
-- Sibling skill — HF dataset catalog including
-  `PhysicalAI-Autonomous-Vehicles-NuRec` (USDZs whose renders the
-  harmonizer is most commonly applied to):
-  [`../physical-ai-datasets/SKILL.md`](../physical-ai-datasets/SKILL.md).
-- NGC harmonizer model card:
-  <https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nre/models/nurec-fixer?version=cosmos_3dgut_fixer_harmonizer>
-- NGC PyTorch base container:
-  <https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch>
-- Difix3D+ paper (academic ancestor):
-  <https://arxiv.org/abs/2503.01774>
-- NVIDIA Research project page:
-  <https://research.nvidia.com/labs/toronto-ai/difix3d/>
+- `references/wrapper-image.md` — build and run the project image for
+  repeat inference.
+- `references/troubleshooting.md` — common setup, inference, training,
+  and evaluation failures.
+- `references/teardown.md` — cleanup inventory for images, code,
+  Hugging Face caches, datasets, and outputs.
+- Public code: <https://github.com/NVIDIA/harmonizer>
+- Model card: <https://huggingface.co/nvidia/DiffusionHarmonizer>
+- Dataset: <https://huggingface.co/datasets/nvidia/DiffusionHarmonizer-Dataset>
+- Paper: <https://arxiv.org/abs/2602.24096>
+- Project page: <https://research.nvidia.com/labs/sil/projects/diffusion-harmonizer/>
 
 ## Limitations
 
-- **Rendered inputs only.** The harmonizer is trained on
-  3D-reconstruction artifacts (3DGS, NeRF, NRE); it is not a general
-  image enhancer and may distort real photographs.
-- **Internal resolution fixed at 1024×576.** Inputs are resized to
-  that resolution before the model and back to `(W, H)` after.
-  Non-16:9 content is preserved but geometric fidelity may suffer.
-- **Sequence ordering depends on filename natural-sort.** Use
-  zero-padded indices (`frame_0001.png`) to avoid misordering. The
-  temporal model consumes the previous 4 outputs as references; if
-  filenames misorder, references are wrong and quality degrades
-  silently.
-- **Temporal coherence relies on prior outputs.** Re-running on a
-  non-empty `output_dir` mixes stale frames into the reference window
-  and degrades quality — always start from an empty directory.
-- **First 4 frames are nontemporal.** The opening frames go through
-  `harmonizer_nontemporal.pt` and may show a visible seam where the
-  temporal model takes over; either discard the warm-up frames or
-  prepend copies of the first frame and drop those copies on output.
-- **Beta release.** Flag names, the model file layout, and the
-  required base image may change between minor versions. Pin the NGC
-  artifact version (`cosmos_3dgut_fixer_harmonizer`) and the base
-  image tag (`24.10-py3`) for reproducibility.
-- **GPU architecture.** Requires Ampere or newer (compute capability
-  ≥ 8.0; inference uses bfloat16 autocast).
-- **No standalone evaluation script.** Unlike the previous V2 HF
-  release, the unified beta artifact does **not** ship
-  `evaluate_test_dataset.py`. PSNR / LPIPS evaluation must be wired
-  up by the caller (e.g. via `lpips` and `torchmetrics` against
-  paired ground-truth frames).
+- **Rendered inputs only.** The model is tuned for neural-reconstruction
+  renderings and object insertion artifacts, not arbitrary real photos.
+- **Primary model resolution is 576x1024.** The public script maps
+  resolution key `1024` to `1024x576` and restores outputs to the
+  original image size. Other keys are script-supported but may not match
+  the model-card operating point.
+- **Filename ordering matters.** The standard inference script sorts
+  filenames as strings. Use zero-padded frame numbers.
+- **Container builds can be large.** The Cosmos environment, build cache,
+  model weights, and optional dataset can exceed 100 GB.
+- **Training is multi-GPU by default.** The README command assumes 8 GPUs
+  with bf16 mixed precision. Scale carefully and expect to tune batch,
+  accumulation, and worker counts.
+- **Public code evolves.** If a checkout uses the older
+  `inference_pretrained_model_harmonizer.py` name, prefer the script
+  present in that checkout, but the fixed release branch standardizes on
+  `inference_pretrained_model.py`.
 
 ## Troubleshooting
 
 | Error / symptom | Most common cause |
 |-----------------|-------------------|
-| `docker pull` 401 / 403 on `pytorch:24.10-py3` | `docker login nvcr.io` not run, or `NGC_API_KEY` expired. |
-| `ngc registry model download-version ... 403` | NGC CLI not configured, or the API key lacks the `nvidia/nre` scope. |
-| `RuntimeError` loading `harmonizer_*.pt` | Mismatched torch / CUDA version. Always run inside `pytorch:24.10-py3`, not on the host. |
-| Output files owned by `root:root` | Forgot `-u $(id -u):$(id -g)` on `docker run`. |
-| `CUDA error: out of memory` | GPU < 16 GB VRAM. Run on Ampere+ with at least 16 GB. |
-| Script can't find `harmonizer_temporal.pt` | Forgot the `-v "$ARTIFACT_DIR":/work:ro` mount, or `--temporal_model_path` points at a host path instead of `/work/...`. |
-| `unrecognized arguments: --nontemporal_model_path` | Beta artifact spells the flag `--non_temporal_model_path`. Run `python /work/inference_jit_harmonizer.py --help` and use whichever the help message lists. |
-| Output frame count < input frame count | Hidden files / unsupported extensions in input. |
-| Visible seam at frame 5 of a sequence | Expected — temporal model takes over from the nontemporal warm-up. Discard warm-up frames or prepend copies of frame 0. |
+| `docker: could not select device driver ... gpu` | NVIDIA Container Toolkit is missing or Docker is not configured for the NVIDIA runtime. |
+| `docker pull` 401 / 403 from `nvcr.io` | Docker is not authenticated to NGC, or the API key lacks container access. |
+| `hf download ... 401 / 403` | `HF_TOKEN` is missing, expired, lacks read scope, or the model/dataset license has not been accepted. |
+| `pretrained_harmonizer.pkl` missing | Model download path is wrong or incomplete. Re-run `hf download nvidia/DiffusionHarmonizer --local-dir models`. |
+| `No such file: inference_pretrained_model_harmonizer.py` | The fixed branch uses `src/inference_pretrained_model.py`. Use the script name in the checkout. |
+| Patch fails on Blackwell | The patch was already applied by the Dockerfile, or the installed Cosmos package version differs from the patch target. |
+| Output files owned by `root` | The `docker run` omitted `-u $(id -u):$(id -g)`. |
+| Evaluation finds no pairs | `render/` and `gt/` structures or filenames do not match exactly. |
+| `CUDA out of memory` | Resolution, batch size, TensorRT compilation, or training configuration exceeds GPU memory. Lower resolution/batch or use a larger GPU. |
 
-Full diagnostic table — root cause and fix for every row above — lives
-in [`references/troubleshooting.md`](references/troubleshooting.md).
+Full diagnostic notes live in `references/troubleshooting.md`.
 
 ## Teardown
 
-A complete harmonizer workflow leaves roughly **~30 GB** on the host:
-~25 GB for `nvcr.io/nvidia/pytorch:24.10-py3`, ~5 GB of NGC harmonizer
-artifact (mostly the two `.pt` checkpoints), plus a sequence-dependent
-output directory. Reclaim disk with:
+A full workflow can leave large artifacts on disk: the Cosmos image,
+project image, build cache, `harmonizer` code checkout, Hugging Face
+model weights, optional dataset, evaluation outputs, and enhanced
+frames. Reclaim them with the inventory in `references/teardown.md`.
 
-```bash
-docker image rm nvcr.io/nvidia/pytorch:24.10-py3 2>/dev/null || true
-docker image prune -f
-rm -rf ./nurec-fixer_vcosmos_3dgut_fixer_harmonizer
-rm -rf /absolute/path/to/enhanced_frames
-rm -rf "${HOME}/.cache/nre/difix"     # only if you used --enable-difix
-```
-
-If outputs were created **before** `-u $(id -u):$(id -g)` was added to
-the `docker run` command, they are owned by `root` and need
-`sudo chown -R "$(id -u):$(id -g)" <dir>` first. See
-[`references/teardown.md`](references/teardown.md) for the full
-inventory, ownership-recovery commands, and post-teardown
-verification.
-
-Do **not** revoke `NGC_API_KEY` as part of teardown unless you suspect
-it has been leaked (see [Verifying secrets safely](#verifying-secrets-safely)).
+Do not revoke `HF_TOKEN` or `NGC_API_KEY` as normal cleanup. Rotate a
+token only if you suspect it was leaked.

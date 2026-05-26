@@ -36,7 +36,7 @@ NuRec task to the right sibling skill below.
 | [`ncore`](./.agents/skills/ncore/SKILL.md) | `.agents/skills/ncore/` | upstream `2026.04` | Convert any sensor recording (cameras, LiDAR, radar, IMU, depth, stereo) into [NCore V4](https://github.com/NVIDIA/ncore) — the format NRE consumes. Includes a converter template. |
 | [`nre`](./.agents/skills/nre/SKILL.md) | `.agents/skills/nre/_versions/release_26.04/85ba2e2/` | NRE `release_26.04` | Train 3DGUT/3DGRT Gaussian reconstructions, render novel views (local or via gRPC), export PLY/mesh/depth, edit actors, evaluate quality. Drives the public `nvcr.io/nvidia/nre/{nre,nre-tools}` containers. |
 | [`asset-harvester`](./.agents/skills/asset-harvester/SKILL.md) | `.agents/skills/asset-harvester/_versions/main/e08b1b2/` | upstream `main` @ `e08b1b2` | Extract per-object 3D Gaussian Splat assets from sparse AV-clip views via SparseViewDiT + TokenGS. Open-source ([NVIDIA/asset-harvester](https://github.com/NVIDIA/asset-harvester), Apache-2.0). |
-| [`nurec-fixer`](./.agents/skills/nurec-fixer/SKILL.md) | `.agents/skills/nurec-fixer/_versions/main/617a990/` | upstream `main` @ `617a990` | Post-process novel-view renders with the NVIDIA Fixer (Difix3D+) diffusion model — removes ghosting, floaters, and temporal flicker. |
+| [`nurec-fixer`](./.agents/skills/nurec-fixer/SKILL.md) | `.agents/skills/nurec-fixer/_versions/main/617a990/` | DiffusionHarmonizer release branches @ `54596de` / `2422370` / `3616343` | Post-process, evaluate, or fine-tune novel-view renders with NVIDIA DiffusionHarmonizer, the current public harmonizer for reconstruction artifacts and inserted-object appearance. |
 
 ## Repo layout
 
@@ -115,13 +115,16 @@ its own prerequisites in detail; the headline ones:
 - **OS / arch:** Linux x86_64 with NVIDIA drivers (CUDA 12.x). aarch64
   is not supported by the NRE containers.
 - **GPU:** Ampere or newer (compute capability ≥ 8.0). 16 GB VRAM is
-  the practical floor for the Fixer; 24–48 GB+ is recommended for NRE
-  training.
+  the practical floor for harmonizer inference; 24–48 GB+ is
+  recommended for NRE training, and multi-GPU hosts are expected for
+  DiffusionHarmonizer training.
 - **Containers:** Docker 23+ and the NVIDIA Container Toolkit are
   required for `nre`, `nre-tools`, and `nurec-fixer`. NGC API key is
-  required to pull `nvcr.io/nvidia/nre/*`.
-- **Hugging Face:** an `HF_TOKEN` is required for any gated dataset
-  (`nvidia/PhysicalAI-Autonomous-Vehicles*`, `nvidia/Fixer`,
+  required to pull `nvcr.io/nvidia/nre/*` and may also be required for
+  `nvcr.io/nvidia/cosmos/*` container pulls.
+- **Hugging Face:** an `HF_TOKEN` is required for any gated dataset or
+  model (`nvidia/PhysicalAI-Autonomous-Vehicles*`,
+  `nvidia/DiffusionHarmonizer`, `nvidia/DiffusionHarmonizer-Dataset`,
   `nvidia/asset-harvester`, …).
 - **Python / conda:** required for the Asset Harvester install path
   and for the NCore in-process API (`pip install nvidia-ncore`).
@@ -154,9 +157,9 @@ Each skill is thin; the canonical artifacts live upstream:
 - **Asset Harvester** — <https://github.com/NVIDIA/asset-harvester>
   (paper: <https://arxiv.org/abs/2604.18468>; demo:
   <https://huggingface.co/spaces/nvidia/asset-harvester>)
-- **Fixer (Difix3D+)** — <https://huggingface.co/nvidia/Fixer>
-  (open-source code: <https://github.com/nv-tlabs/Difix3D>; paper:
-  <https://arxiv.org/abs/2503.01774>)
+- **DiffusionHarmonizer** — <https://huggingface.co/nvidia/DiffusionHarmonizer>
+  (open-source code: <https://github.com/NVIDIA/harmonizer>; paper:
+  <https://arxiv.org/abs/2602.24096>)
 - **Physical AI datasets** — <https://huggingface.co/nvidia> (filter
   `PhysicalAI-`); curated collection
   <https://huggingface.co/collections/nvidia/physical-ai>

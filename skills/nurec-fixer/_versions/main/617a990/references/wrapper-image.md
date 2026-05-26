@@ -1,87 +1,78 @@
-# Wrapper Image — Pre-installed `requirements.txt` for Faster Repeat Inference
+# Runtime Image — DiffusionHarmonizer
 
-The default [Run inference](../SKILL.md#run-inference) recipe installs
-the harmonizer artifact's `requirements.txt` on every `docker run` (to
-the per-run `PYTHONUSERBASE=/tmp/pyuser`). That is fine for one-off
-runs but wastes ~30–60 seconds per invocation on a CI server or batch
-host. For repeat-use workflows, bake a small wrapper image once that
-pre-installs the deps on top of `pytorch:24.10-py3`.
+The current DiffusionHarmonizer release is intended to run in a Cosmos
+Predict2 environment. For repeat inference, build the project image once
+from the public `NVIDIA/harmonizer` checkout instead of installing
+packages interactively on every run.
 
-## Build the wrapper image
-
-From the parent directory of `nurec-fixer_vcosmos_3dgut_fixer_harmonizer/`:
+## Build The Image
 
 ```bash
-ARTIFACT_DIR=$(pwd)/nurec-fixer_vcosmos_3dgut_fixer_harmonizer
-
-cat > Dockerfile.harmonizer <<'EOF'
-# Layer harmonizer requirements on top of the public PyTorch base.
-FROM nvcr.io/nvidia/pytorch:24.10-py3
-
-# Pin the artifact version this image was built for so a future
-# version bump is forced through a fresh `docker build`.
-LABEL nvidia.harmonizer.version="cosmos_3dgut_fixer_harmonizer"
-
-WORKDIR /opt/harmonizer
-COPY artifact/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-EOF
-
-# Stage just the requirements.txt so the build context stays small.
-mkdir -p ./build/artifact
-cp "$ARTIFACT_DIR/requirements.txt" ./build/artifact/
+CODE_DIR=$PWD/harmonizer
+git clone https://github.com/NVIDIA/harmonizer.git "$CODE_DIR"
+cd "$CODE_DIR"
 
 docker build \
-  -f Dockerfile.harmonizer \
-  -t nurec-harmonizer:beta \
-  ./build
+  -t harmonizer-cosmos-env \
+  -f Dockerfile.cosmos \
+  .
 ```
 
-Substitute the image tag if your site uses a registry-prefixed name.
-
-## Run inference against the wrapper image
+If your site requires authenticated NGC pulls, login first:
 
 ```bash
-IMAGE=nurec-harmonizer:beta
-ARTIFACT_DIR=$(pwd)/nurec-fixer_vcosmos_3dgut_fixer_harmonizer
+echo "$NGC_API_KEY" | docker login nvcr.io --username '$oauthtoken' --password-stdin
+```
+
+The release README names `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2`
+as the base environment. Do not use `:latest` in reproducible workflows.
+
+## Run Inference
+
+```bash
+IMAGE=harmonizer-cosmos-env
+CODE_DIR=/absolute/path/to/harmonizer
 INPUT_DIR=/absolute/path/to/rendered_frames
 OUTPUT_DIR=/absolute/path/to/enhanced_frames
 
 mkdir -p "$OUTPUT_DIR"
-[ -z "$(ls -A "$OUTPUT_DIR" 2>/dev/null)" ] || {
-  echo "ERROR: $OUTPUT_DIR is not empty."
-  exit 1
-}
 
 docker run --gpus=all --rm --ipc=host \
   -u "$(id -u):$(id -g)" \
-  -v "$ARTIFACT_DIR":/work:ro \
-  -v "$INPUT_DIR":/in:ro \
-  -v "$OUTPUT_DIR":/out \
+  -v "$CODE_DIR":/work \
+  -v "$INPUT_DIR":/input:ro \
+  -v "$OUTPUT_DIR":/output \
   -w /work \
   "$IMAGE" \
-  python /work/inference_jit_harmonizer.py \
-    --input_image /in \
-    --output_dir /out \
-    --temporal_model_path /work/harmonizer_temporal.pt \
-    --nontemporal_model_path /work/harmonizer_nontemporal.pt
+  python /work/src/inference_pretrained_model.py \
+    --model /work/models/pretrained/pretrained_harmonizer.pkl \
+    --input /input \
+    --output /output \
+    --timestep 250 \
+    --resolution 1024
 ```
 
-No `pip install` step is needed at runtime, so the image can run
-without a writable `PYTHONUSERBASE`. The artifact is still mounted
-read-only at `/work` so a future version bump does not require a
-rebuild — only a new `ngc registry model download-version` and a
-swapped mount.
+Keep the model weights under `$CODE_DIR/models` by running:
 
-## Rebuild policy
+```bash
+hf download nvidia/DiffusionHarmonizer --local-dir "$CODE_DIR/models"
+```
 
-Re-run `docker build` whenever:
+## Raw Container Mode
 
-- You bump the harmonizer NGC version (e.g. a future
-  `cosmos_3dgut_fixer_harmonizer_v2`) and its `requirements.txt`
-  changes.
-- NGC publishes a new dated tag of `pytorch:24.10-py3` and you want
-  the security updates.
+If you run directly from `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2`,
+install the checkout's requirements and apply the patches documented in
+`SKILL.md`. For Blackwell inference, the README calls out
+`text2image_dit.patch`; for training, it also calls out `tokenizer.patch`.
+The project image should apply these patches during build.
 
-Treat the wrapper image as disposable; it does not contain the model
-weights and is cheap to recreate.
+## Rebuild Policy
+
+Rebuild the image whenever:
+
+- The `NVIDIA/harmonizer` checkout changes.
+- The base Cosmos Predict2 container tag changes.
+- `requirements.txt`, `tokenizer.patch`, or `text2image_dit.patch` changes.
+
+Treat the image as disposable. It should not bake in `HF_TOKEN`,
+`NGC_API_KEY`, datasets, or downloaded model checkpoints.
