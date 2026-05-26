@@ -1,0 +1,12 @@
+NuRec Skills
+
+Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This repository contains NVIDIA-authored agent skills, documentation, helper
+scripts, workflow configuration, examples, and templates for working with
+NVIDIA Omniverse NuRec and related NVIDIA tools.
+
+This repository does not vendor or redistribute third-party OSS source code or
+third-party binary dependencies. External tools, packages, containers, models,
+and datasets referenced by the skills are obtained from their original upstream
+distribution channels and retain their own copyright notices and license terms.

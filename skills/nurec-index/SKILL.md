@@ -19,7 +19,7 @@ description: >-
 version: "0.2.0"
 tools:
   - Read
-license: CC-BY-4.0
+license: CC-BY-4.0 AND Apache-2.0
 metadata:
   author: NVIDIA NRS
   tags:

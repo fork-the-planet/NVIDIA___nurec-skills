@@ -1,5 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+#
+# Runtime dependencies when executing this template:
+# - NumPy (BSD-3-Clause): https://numpy.org/
+# - universal-pathlib (MIT): https://github.com/fsspec/universal_pathlib
 
 """
 Example (skeleton) NCore V4 converter.

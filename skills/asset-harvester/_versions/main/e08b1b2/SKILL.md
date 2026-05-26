@@ -22,7 +22,7 @@ tools:
   - Shell
   - Read
   - Write
-license: CC-BY-4.0
+license: CC-BY-4.0 AND Apache-2.0
 compatibility: >-
   Linux with conda (Miniconda or Miniforge), NVIDIA driver >= 570
   (CUDA 12.8 compatible), GCC 10-13 (tested 12.3), CUDA toolkit 12.8

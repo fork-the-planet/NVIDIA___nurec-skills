@@ -126,6 +126,22 @@ its own prerequisites in detail; the headline ones:
 - **Python / conda:** required for the Asset Harvester install path
   and for the NCore in-process API (`pip install nvidia-ncore`).
 
+## Third-party dependencies and bundled code
+
+The skills in this repository are Markdown instructions plus lightweight
+NVIDIA-authored helper files. They do not require third-party libraries to
+be discovered or read, and they do not vendor or redistribute third-party
+OSS source code or third-party binary dependencies. Bundled validation
+scripts use only the Python standard library and host tools already called
+out by the relevant skill.
+
+Some workflows documented by the skills instruct users to install or run
+external upstream tools, containers, Python packages, models, or datasets
+from their original distribution channels. Those upstream artifacts are
+not redistributed by this repository and retain their own licenses. See
+[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) for the repository's
+third-party notice statement.
+
 ## Upstream sources of truth
 
 Each skill is thin; the canonical artifacts live upstream:
@@ -150,6 +166,9 @@ folder and update the symlinks at the skill root.
 
 ## Contributing
 
+This project is currently not accepting contributions. Issues or pull
+requests from external contributors will not be accepted.
+
 - Frontmatter follows the [agentskills.io](https://agentskills.io)
   schema (`name`, `description`, `version`, `license`, `metadata`).
   Trigger keywords belong inside `description:` so the runtime indexes
@@ -163,15 +182,22 @@ folder and update the symlinks at the skill root.
 
 ## License
 
-This repo is dual-licensed:
+This repository is released under dual **CC-BY-4.0 AND Apache-2.0**
+terms. The full Apache-2.0 license text is distributed in
+[`LICENSE`](./LICENSE), and the full Creative Commons Attribution 4.0
+International license text is distributed in
+[`LICENSE-CC-BY-4.0`](./LICENSE-CC-BY-4.0).
 
-- **Skills** (every `SKILL.md` and its accompanying prose / references)
-  are licensed under [**CC-BY-4.0**](https://creativecommons.org/licenses/by/4.0/).
-  Each skill restates this in its frontmatter (`license: CC-BY-4.0`).
-- **Scripts** (everything under `scripts/` and the `ncore_template/`
-  Python package) are licensed under
-  [**Apache-2.0**](https://www.apache.org/licenses/LICENSE-2.0). Every
-  source file carries an `SPDX-License-Identifier: Apache-2.0` header.
+- **Code-only files** (for example, helper scripts, workflow YAML, test
+  YAML, environment examples, and the `ncore_template/` Python package)
+  are licensed under
+  [**Apache-2.0**](https://www.apache.org/licenses/LICENSE-2.0). NVIDIA
+  authored source files carry `SPDX-License-Identifier: Apache-2.0`
+  headers.
+- **Mixed documentation files** (for example, `SKILL.md`, reference
+  Markdown files, and this README) are licensed under the repository's
+  dual **CC-BY-4.0 AND Apache-2.0** terms. The skill frontmatter records
+  this as `license: CC-BY-4.0 AND Apache-2.0`.
 
 The skills only *drive* upstream NVIDIA artifacts (NGC containers,
 GitHub repos, Hugging Face models and datasets). Those upstream

@@ -20,7 +20,7 @@ tools:
   - Shell
   - Read
   - Write
-license: CC-BY-4.0
+license: CC-BY-4.0 AND Apache-2.0
 metadata:
   author: NVIDIA NCore
   tags:

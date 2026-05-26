@@ -23,7 +23,7 @@ tools:
   - Shell
   - Read
   - Write
-license: CC-BY-4.0
+license: CC-BY-4.0 AND Apache-2.0
 compatibility: >-
   Linux host with an NVIDIA GPU of Ampere architecture or newer
   (compute capability >= 8.0; A100, A10, L40, H100, RTX 30/40/PRO,
