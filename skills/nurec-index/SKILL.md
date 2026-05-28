@@ -1,9 +1,21 @@
 ---
 name: nurec-index
 description: >-
-  Routes NVIDIA NuRec / NRE tasks to the right sibling skill: nre,
-  ncore, asset-harvester, nurec-fixer, or physical-ai-datasets.
-version: "0.2.2"
+  Use when a user mentions NVIDIA NuRec, Neural Reconstruction Engine
+  (NRE), 3DGUT/3DGRT, USDZ scenes, NCore V4 conversion, asset
+  harvesting, or rendered-frame cleanup but the correct sibling skill
+  (nre, ncore, asset-harvester, nurec-fixer, physical-ai-datasets) is
+  not yet obvious — this router classifies the request, maps it to a
+  goal-based table, and hands off to exactly one sibling. Use for
+  multi-stage NuRec pipelines (convert + train + render, dataset +
+  render, harvest + insert, render + harmonize) where you need to
+  pick the right starting skill and walk the workflow in order. Do
+  NOT use when the right sub-skill is already obvious (open it
+  directly); Do NOT use for non-NuRec tasks; Do NOT use to run any
+  container, training, rendering, conversion, download, or teardown
+  itself — this skill is read-only routing and always defers
+  execution to the sibling it points to.
+version: "0.2.3"
 tools:
   - Read
 license: CC-BY-4.0 AND Apache-2.0
@@ -61,6 +73,45 @@ but the right sub-skill is not yet obvious. Always read this first.
 - The task is not a NuRec task (this skill will not help).
 - Hands-on implementation steps are needed — defer to the sub-skill
   this index points at.
+
+## Purpose
+
+This skill exists so an agent never has to *guess* which NuRec-family
+skill to read next. It is a hand-curated router for the
+five-skill NuRec family and nothing else.
+
+**Use cases this skill is built for:**
+
+- **Disambiguate a NuRec request.** The user says "render this
+  clip", "convert this bag", "fix these frames", or "extract this
+  car" and you need to pick the one sibling skill that owns that
+  verb.
+- **Bootstrap a multi-stage pipeline.** The user's goal needs two or
+  three siblings in a fixed order (convert → train → render, dataset
+  → render, harvest → insert, render → harmonize). This index points
+  you at the right starting sibling and the matching workflow A–G in
+  [`references/workflows.md`](references/workflows.md).
+- **Translate NuRec jargon for a beginner.** NuRec vs NRE, USDZ vs
+  NCore V4, 3DGUT vs 3DGRT, NRE's built-in Fixer vs the standalone
+  DiffusionHarmonizer — see [Easy mix-ups](#easy-mix-ups).
+- **Locate a sibling skill that is not on disk.** Defer to
+  [`references/discovery.md`](references/discovery.md) instead of
+  guessing a path.
+- **Plan disk cleanup across the family.** A full NuRec workflow
+  can leave 150 GB+ behind; defer to
+  [`references/teardown.md`](references/teardown.md) for the
+  documented order.
+
+**Use cases this skill is explicitly NOT built for:**
+
+- Running any container, training job, rendering job, conversion,
+  dataset download, server, or teardown — always handed off to the
+  sibling.
+- Routing tasks outside the NuRec family (Omniverse, Isaac Sim,
+  CARLA, Cosmos-* training, generic Hugging Face downloads).
+- Discovering newly-added sibling skills automatically — the
+  catalogue is hand-curated and must be edited by hand (see
+  [Keeping this index up to date](#keeping-this-index-up-to-date)).
 
 ## Instructions
 
