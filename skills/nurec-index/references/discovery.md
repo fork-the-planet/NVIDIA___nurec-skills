@@ -10,11 +10,11 @@ All sibling skills live in this public repo:
 
 <https://github.com/NVIDIA/nurec-skills>
 
-Each one is at `.agents/skills/<folder>/SKILL.md`. Skills that pin
-a specific upstream commit ship the actual file under
-`.agents/skills/<folder>/_versions/<branch>/<commit>/SKILL.md`,
-with a top-level `<folder>/SKILL.md` symlink that points at the
-currently-selected version.
+Each one is at `.agents/skills/<folder>/SKILL.md`, plus its
+companion `references/`, `scripts/`, and (where present)
+`tests.yaml`. Upstream commits / container tags / model release
+branches are pinned inside the skill's frontmatter `metadata:`
+block, not in the folder path.
 
 ## 2. The name is portable; the folder is not
 

@@ -8,9 +8,9 @@ no longer needed:
 
 | Sibling skill | What to read | Approximate footprint |
 |---------------|--------------|------------------------|
-| `nre` | `nre/SKILL.md#teardown` + `nre/_versions/release_26.04/85ba2e2/references/teardown.md` | ~120 GB images + caches + per-run outputs |
-| `nurec-fixer` | `nurec-fixer/SKILL.md#teardown` + `nurec-fixer/_versions/main/617a990/references/teardown.md` | 100 GB+ possible between Cosmos image/build cache, HF model/dataset, checkout, and outputs |
-| `asset-harvester` | `asset-harvester/SKILL.md#teardown` | ~30 GB conda envs + checkpoints + outputs |
+| `nre` | `nre/SKILL.md#teardown` + `nre/references/teardown.md` | ~120 GB images + caches + per-run outputs |
+| `nurec-fixer` | `nurec-fixer/SKILL.md#teardown` + `nurec-fixer/references/teardown.md` | 100 GB+ possible between Cosmos image/build cache, HF model/dataset, checkout, and outputs |
+| `asset-harvester` | `asset-harvester/references/troubleshooting.md#teardown` | ~30 GB conda envs + checkpoints + outputs |
 | `ncore` | NCore shards live under `<dataset_dir>/`; delete after NRE training is done | clip-dependent |
 | `physical-ai-datasets` | HF caches live under `${HF_HOME:-$HOME/.cache/huggingface}/hub/`; remove per-dataset directories | dataset-dependent |
 

@@ -47,7 +47,7 @@ scope a single invocation to one clip by setting
 host-side rig dir is provided:
 
 ```bash
-INPUT_RIG_HOST="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")/skills/nre/_versions/release_26.04/85ba2e2/references/rig-json"
+INPUT_RIG_HOST="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")/skills/nre/references/rig-json"
 ```
 
 and pass `augmented_rig.json` explicitly to `--rig-json`
@@ -363,7 +363,7 @@ AUGMENTED_RIG=$(find "$INPUT_RIG_HOST" -name "*_augmented.json" -type f | head -
 if [ -z "$AUGMENTED_RIG" ]; then
   # Fallback to the bundled example rig that ships with this skill.
   REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-  FALLBACK_RIG_DIR="$REPO_ROOT/skills/nre/_versions/release_26.04/85ba2e2/references/rig-json"
+  FALLBACK_RIG_DIR="$REPO_ROOT/skills/nre/references/rig-json"
   if [ -f "$FALLBACK_RIG_DIR/augmented_rig.json" ]; then
     echo "No *_augmented.json under $INPUT_RIG_HOST; falling back to bundled example rig at $FALLBACK_RIG_DIR/augmented_rig.json"
     INPUT_RIG_HOST="$FALLBACK_RIG_DIR"
@@ -393,7 +393,7 @@ fi
 # Map the rig onto the scene trajectory.
 #
 # Fast path: a pre-baked trajectory may ship in
-# skills/nre/_versions/release_26.04/85ba2e2/references/custom-rig-trajectories/ for
+# skills/nre/references/custom-rig-trajectories/ for
 # the bundled augmented_rig.json + canonical sample clips. Filename
 # convention: <clip-uuid-prefix>_custom_rig_trajectories.json (8-char
 # prefix of the USDZ UUID). Only valid when the active rig IS the
@@ -402,13 +402,13 @@ fi
 # full docker run (~2-3 min on A100-class hardware).
 mkdir -p "$output_dir"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
-CACHE_DIR="$REPO_ROOT/skills/nre/_versions/release_26.04/85ba2e2/references/custom-rig-trajectories"
+CACHE_DIR="$REPO_ROOT/skills/nre/references/custom-rig-trajectories"
 CLIP_UUID="$(basename "${found_usdz_path%.usdz}")"
 CLIP_PREFIX="${CLIP_UUID:0:8}"
 CACHED_TRAJ="$CACHE_DIR/${CLIP_PREFIX}_custom_rig_trajectories.json"
 USING_BUNDLED_RIG=0
 case "$AUGMENTED_RIG" in
-  "$REPO_ROOT/skills/nre/_versions/release_26.04/85ba2e2/references/rig-json/augmented_rig.json")
+  "$REPO_ROOT/skills/nre/references/rig-json/augmented_rig.json")
     USING_BUNDLED_RIG=1
     ;;
 esac
