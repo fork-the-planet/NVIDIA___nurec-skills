@@ -3,8 +3,6 @@ defaults:
   - /apps/AV/Waymo/3dgut_dynamic.yaml
   - /apps/AV/module_mixins/_calib_mixin.yaml
   - override /model/calib: free_pose
-  - override /model/post_processing@model.post_processing.b: null # needed to make it render in kit until post-processing is fixed
-  - override /model/post_processing@model.post_processing.c: null # needed to make it render in kit until post-processing is fixed
   - _self_
 
 dataset:
