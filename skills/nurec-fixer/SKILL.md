@@ -1,1 +1,1 @@
-_versions/main/617a990/SKILL.md
+../../skill_versions/nurec-fixer/_versions/main/617a990/SKILL.md

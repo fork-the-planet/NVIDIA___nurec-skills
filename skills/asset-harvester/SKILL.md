@@ -1,1 +1,1 @@
-_versions/main/e08b1b2/SKILL.md
+../../skill_versions/asset-harvester/_versions/main/e08b1b2/SKILL.md

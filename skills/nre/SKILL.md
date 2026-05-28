@@ -1,1 +1,1 @@
-_versions/release_26.04/85ba2e2/SKILL.md
+../../skill_versions/nre/_versions/release_26.04/85ba2e2/SKILL.md
