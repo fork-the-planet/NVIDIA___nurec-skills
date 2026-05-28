@@ -1,56 +1,26 @@
-# DiffusionHarmonizer — Container setup, model download, inference
+# DiffusionHarmonizer — Model download and inference
 
 Detail moved out of `SKILL.md`.
 
 ## Container setup
 
-The release branches target the Cosmos Predict2 environment. The
-preferred external path is to clone the public code and build the
-image from its `Dockerfile.cosmos`:
+Build instructions (and the raw-Cosmos fallback) are in
+[`wrapper-image.md`](wrapper-image.md). Stop there first; the rest of
+this file assumes the `harmonizer-cosmos-env` image (or an equivalent
+raw Cosmos Predict2 container) is already available.
 
-```bash
-CODE_DIR=$PWD/harmonizer
-git clone https://github.com/NVIDIA/harmonizer.git "$CODE_DIR"
-cd "$CODE_DIR"
-
-docker build \
-  -t harmonizer-cosmos-env \
-  -f Dockerfile.cosmos \
-  .
-```
-
-If the project Dockerfile is unavailable in a particular release
-checkout, run from the pinned public Cosmos Predict2 image and
-install only the packages listed by that checkout:
-
-```bash
-BASE=nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
-
-docker run --gpus=all --rm -it --ipc=host \
-  -u "$(id -u):$(id -g)" \
-  -v "$CODE_DIR":/work \
-  -w /work \
-  "$BASE" \
-  bash
-```
-
-For Blackwell GPUs such as B200 or GB200, the README branch calls
-out a Text2ImageDIT patch before inference when using the raw
-container:
+If you are running directly inside the raw Cosmos Predict2 base
+container (no project image) on Blackwell (B200, GB200), apply the
+Text2ImageDIT patch shipped in the checkout before inference, and the
+tokenizer patch as well for training:
 
 ```bash
 patch /usr/local/lib/python3.12/dist-packages/cosmos_predict2/models/text2image_dit.py text2image_dit.patch
-```
-
-For training, apply the tokenizer patch as well if the project
-image did not already apply it:
-
-```bash
 patch /usr/local/lib/python3.12/dist-packages/cosmos_predict2/tokenizers/tokenizer.py tokenizer.patch
 ```
 
-The project image should bake these patches in. Only apply them
-manually when running directly inside a raw base container.
+The project Dockerfile bakes both patches in; apply them by hand only
+in raw-container mode.
 
 ## Model download
 

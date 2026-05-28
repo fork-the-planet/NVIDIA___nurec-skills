@@ -1,15 +1,9 @@
 # NRE — CLI cookbook
 
-Most-used `docker run` invocations. The single-line summary lives
-in `SKILL.md`; flag-level help is in the in-container CLI:
-
-```bash
-docker run --rm --gpus all nvcr.io/nvidia/nre/nre:latest --help
-docker run --rm --gpus all nvcr.io/nvidia/nre/nre:latest render --help
-docker run --rm --gpus all nvcr.io/nvidia/nre/nre:latest serve-grpc --help
-docker run --rm --gpus all nvcr.io/nvidia/nre/nre:latest export-mesh --help
-docker run --rm --gpus all nvcr.io/nvidia/nre/nre:latest upgrade-artifact --help
-```
+Most-used `docker run` invocations. The single-line summary lives in
+`SKILL.md`. See `references/cli-reference.md` for the full command
+inventory, the per-sub-command `--help` examples, and the authoritative
+flag tables.
 
 ## Train + validate (Waymo-style dynamic 3DGUT)
 

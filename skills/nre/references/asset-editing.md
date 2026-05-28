@@ -70,26 +70,18 @@ backwards compatibility.
 
 ## Step 1 — Repackage AH output into a new USDZ
 
-Run `export-external-assets`:
+Run [`export-external-assets`](cli-reference.md#export-external-assets)
+on the trained USDZ plus the Asset-Harvester output. The full docker
+invocation template, flag matrix, and required-vs-optional table all
+live in the CLI reference — only four flags need to be wired to your
+local paths:
 
-```bash
-docker run --shm-size=64g -it --rm --gpus all \
-  --net=host --privileged \
-  --volume /path/to/output/folder:/workdir/output \
-  nvcr.io/nvidia/nre/nre:latest \
-  export-external-assets \
-  --artifact-path           /path/to/target.usdz \
-  --external-assets-dir     /path/to/AH/output \
-  --output-edit-file        /path/to/output/edit-assets.json \
-  --output-artifact-path    /path/to/output/target-external-assets.usdz
-```
-
-| Flag | Required | Purpose |
-|------|----------|---------|
-| `--artifact-path` | yes | Path to the USDZ that should be repackaged with the harvested assets. |
-| `--external-assets-dir` | yes | Asset-Harvester output directory (must contain `metadata.yaml`). |
-| `--output-edit-file` | yes | Stub `edit-assets.json` written for you to customise. |
-| `--output-artifact-path` | no | Path to write the repackaged USDZ. **If omitted, only the JSON is written** — the existing USDZ is not modified. |
+- `--artifact-path` → the trained USDZ that should be repackaged.
+- `--external-assets-dir` → the Asset-Harvester output directory
+  containing `metadata.yaml`.
+- `--output-edit-file` → where to write the stub `edit-assets.json`.
+- `--output-artifact-path` → where to write the repackaged USDZ;
+  **omit to only emit the JSON** (the source USDZ is left untouched).
 
 After this completes you have:
 

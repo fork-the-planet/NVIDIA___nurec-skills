@@ -1,11 +1,7 @@
+# End-to-End Workflow: PAI → CDS → NCore → NuRec → Asset Harvester → Alpamayo → AlpaSim
 
-<!-- <div align="center">
-
-### End-to-End Workflow for: PAI → CDS → NCore → NuRec → Asset Harvester → Alpamayo → AlpaSim
-
-</div> -->
-
-> Workflow for: PAI → CDS (optional) → NCore → auxiliary data → NuRec → NuRec Renderer.
+> Pipeline scope covered here: PAI → CDS (optional) → NCore → auxiliary
+> data → NuRec → NuRec Renderer.
 
 <!-- ========================================================================== -->
 <!-- SECTION: Goal -->
@@ -52,25 +48,15 @@ You will also need the following accounts and tokens:
 <details open>
 <summary><strong><span style="color:#5E5E5E">Hardware</span></strong></summary>
 
-**Ampere:**
-- Boards: A100 | A10 | A40 | RTX A6000
-- GPUs (Codenames): GA100 | GA102
-- Drivers: R550 or later required, R570 or later recommended
+Supported GPU families (driver baseline R550+, R570+ recommended unless
+noted; Blackwell requires R580+):
 
-**Ada Lovelace:**
-- Boards: L20 | L40 | L40S
-- GPU (Codename): AD102
-- Drivers: R550 or later required, R570 or later recommended
-
-**Grace Hopper:**
-- Boards: H20 | H100
-- GPU (Codename): GH100
-- Drivers: R550 or later required, R570 or later recommended
-
-**Blackwell:**
-- Board: RTX Pro 6000D
-- GPU (Codename): GB202
-- Drivers: R580 or later required
+| Architecture | Boards | GPU codename(s) | Minimum driver |
+|--------------|--------|-----------------|----------------|
+| Ampere | A100, A10, A40, RTX A6000 | GA100, GA102 | R550 (R570 recommended) |
+| Ada Lovelace | L20, L40, L40S | AD102 | R550 (R570 recommended) |
+| Grace Hopper | H20, H100 | GH100 | R550 (R570 recommended) |
+| Blackwell | RTX Pro 6000D | GB202 | R580 |
 
 </details>
 

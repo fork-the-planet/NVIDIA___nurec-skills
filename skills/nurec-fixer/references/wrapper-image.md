@@ -29,42 +29,23 @@ as the base environment. Do not use `:latest` in reproducible workflows.
 
 ## Run Inference
 
-```bash
-IMAGE=harmonizer-cosmos-env
-CODE_DIR=/absolute/path/to/harmonizer
-INPUT_DIR=/absolute/path/to/rendered_frames
-OUTPUT_DIR=/absolute/path/to/enhanced_frames
-
-mkdir -p "$OUTPUT_DIR"
-
-docker run --gpus=all --rm --ipc=host \
-  -u "$(id -u):$(id -g)" \
-  -v "$CODE_DIR":/work \
-  -v "$INPUT_DIR":/input:ro \
-  -v "$OUTPUT_DIR":/output \
-  -w /work \
-  "$IMAGE" \
-  python /work/src/inference_pretrained_model.py \
-    --model /work/models/pretrained/pretrained_harmonizer.pkl \
-    --input /input \
-    --output /output \
-    --timestep 250 \
-    --resolution 1024
-```
-
-Keep the model weights under `$CODE_DIR/models` by running:
-
-```bash
-hf download nvidia/DiffusionHarmonizer --local-dir "$CODE_DIR/models"
-```
+Once the image is built, the canonical `docker run` invocation, the
+full flag matrix for `inference_pretrained_model.py`, and the
+temporal-variant entry point all live in
+[`inference.md`](inference.md). Keep the downloaded weights under
+`$CODE_DIR/models` (see the `hf download` step in `inference.md §
+Model download`) so the `-v "$CODE_DIR":/work` mount picks them up at
+`/work/models/pretrained/pretrained_harmonizer.pkl`.
 
 ## Raw Container Mode
 
-If you run directly from `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2`,
-install the checkout's requirements and apply the patches documented in
-`SKILL.md`. For Blackwell inference, the README calls out
-`text2image_dit.patch`; for training, it also calls out `tokenizer.patch`.
-The project image should apply these patches during build.
+If you run directly from
+`nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2` instead of the
+project image, install the checkout's requirements and apply the
+Blackwell / training patches called out in
+[`inference.md § Container setup`](inference.md#container-setup). The
+project Dockerfile applies these patches during build, so this step
+is only needed in raw-container mode.
 
 ## Rebuild Policy
 

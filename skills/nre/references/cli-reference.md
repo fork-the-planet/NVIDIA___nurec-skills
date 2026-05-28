@@ -56,7 +56,7 @@ docker run --rm --gpus all nvcr.io/nvidia/nre/nre-tools:latest --help
 | `run-script` | Run a custom Python script inside the container's NRE Python env (Bazel runfiles aware). |
 | `generate-asset-harvester-training-yaml` | Build the YAML overlay used to retrain a reconstruction with Asset-Harvester outputs blended in. |
 
-The `nvcr.io/nvidia/nre/nre-tools:latest` container has two entry points: the **NuRec Auxiliary Data Tool** (default) and the **`asset-harvester`** sub-command — see `references/aux-data.md` for the aux-data flag matrix.
+See §2 for the `nvcr.io/nvidia/nre/nre-tools` entry points.
 
 ---
 
@@ -180,14 +180,10 @@ docker run --shm-size=64g -it --rm --gpus all \
   --replicate-training-views
 ```
 
-Required:
+Required: `--artifact-path` (USDZ to render) and `--output-dir`
+(frames land at `<output_dir>/<sensor_id>/<frame_name>.<ext>`).
 
-| Flag | Purpose |
-|------|---------|
-| `--artifact-path` | USDZ to render. |
-| `--output-dir` | Output dir; frames land at `<output_dir>/<sensor_id>/<frame_name>.<ext>`. |
-
-Optional:
+Optional flags:
 
 | Flag | Default | Purpose |
 |------|---------|---------|
@@ -319,12 +315,8 @@ docker run --shm-size=64g -it --rm --gpus all \
   --camera-id camera_front_wide_120fov
 ```
 
-Required flags:
-
-| Flag | Purpose |
-|------|---------|
-| `--artifact-path` | NuRec `.usdz` to render. |
-| `--output-dir` | Output directory for rendered images. |
+Required: `--artifact-path` (NuRec `.usdz` to render) and
+`--output-dir` (rendered images go here).
 
 Optional flags (RGB):
 

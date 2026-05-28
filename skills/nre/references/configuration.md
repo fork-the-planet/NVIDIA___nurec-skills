@@ -10,20 +10,10 @@ flag. Required overrides:
 - `dataset.path=<NCore JSON inside the container>`
 - `out_dir=<output dir inside the container>`
 
-Example:
-
-```bash
-docker run --shm-size=64g -it --rm --gpus all \
-  -e NGC_API_KEY=${NGC_API_KEY} \
-  --volume /path/to/dataset:/workdir/dataset \
-  --volume /path/to/output:/workdir/output \
-  nvcr.io/nvidia/nre/nre:latest \
-  --config-name=configs/apps/AV/Waymo/3dgut_dynamic.yaml \
-  mode=trainval \
-  dataset.path=/workdir/dataset/<NAME>.json \
-  out_dir=/workdir/output \
-  logger=tensorboard
-```
+For the full `docker run` invocation syntax (volumes, NGC auth, image
+tag), see [`cli-reference.md`](cli-reference.md) §1 "Training /
+validation". The rest of this file enumerates the Hydra-side options
+you append after the image tag.
 
 ## Recipe paths shipped in the container
 
@@ -248,9 +238,18 @@ defaults:
   - /difix: difix                                   # default: cosmos_difix variant
   - /system: gaussians
   - /loss: gaussians_av                             # or: gaussians_av_road_semantic
-  - /model/post_processing@model.post_processing.b: bilateral_grid_per_camera
-  - /model/post_processing@model.post_processing.c: bilateral_grid_per_frame
+  # plus two post-processing entries using Hydra's package-override syntax
+  # (see note below)
 ```
+
+Recipes also register two post-processing variants via Hydra's
+package-override syntax `group<AT>target` (where `<AT>` is a literal `@`
+character). The two entries appended to `defaults:` are:
+
+- `/model/post_processing<AT>model.post_processing.b` → `bilateral_grid_per_camera`
+- `/model/post_processing<AT>model.post_processing.c` → `bilateral_grid_per_frame`
+
+Replace `<AT>` with the `@` character when copying into a recipe.
 
 Notable model overrides:
 

@@ -198,21 +198,13 @@ a Cosmos Predict2 Diffusion Transformer post-trained at
 
 ### Example 1 — Enhance a folder of rendered frames
 
-```bash
-python scripts/validate_setup.py   # then build the image once
-docker run --gpus=all --rm --ipc=host \
-  -u "$(id -u):$(id -g)" \
-  -v $PWD/harmonizer:/work \
-  -v /absolute/path/to/rendered_frames:/input:ro \
-  -v /absolute/path/to/enhanced_frames:/output \
-  -w /work harmonizer-cosmos-env \
-  python /work/src/inference_pretrained_model.py \
-    --model /work/models/pretrained/pretrained_harmonizer.pkl \
-    --input /input --output /output \
-    --timestep 250 --resolution 1024
-```
-
-Full flag matrix in
+Run `scripts/validate_setup.py`, build the image once (see
+[`references/wrapper-image.md`](references/wrapper-image.md)), then
+invoke `inference_pretrained_model.py` inside the `harmonizer-cosmos-env`
+container with `$CODE_DIR` mounted at `/work`, the rendered frames at
+`/input:ro`, and the output directory at `/output` — typical flags
+are `--timestep 250 --resolution 1024`. The canonical `docker run`
+command and the full flag matrix live in
 [`references/inference.md`](references/inference.md).
 
 ### Example 2 — Quantitative PSNR / LPIPS evaluation

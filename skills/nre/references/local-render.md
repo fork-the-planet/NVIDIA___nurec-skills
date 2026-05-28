@@ -187,6 +187,35 @@ numbers above are just the rough expectation to set against them.
 
 ---
 
+## Shared helper: `render_ground_truth`
+
+Both options below render an unmodified-rig "ground truth" pass into
+`$OUTPUT_HOST/$SEQUENCE_ID/gt/` before the adapted view. The render
+command is identical in both flows, so it lives in one place here.
+Source this helper into your shell first (it reads `IMAGE`,
+`INPUT_USDZ_HOST`, `OUTPUT_HOST`, `SEQUENCE_ID`, `CAMERA_ID`,
+`IMAGE_FORMAT`, `container_usdz_path`, and `gt_dir` from the
+surrounding snippet's env):
+
+```bash
+render_ground_truth() {
+  # Idempotent — no-op if the GT MP4 is already on disk.
+  [ -f "$OUTPUT_HOST/$SEQUENCE_ID/gt_${CAMERA_ID}.mp4" ] && return 0
+  mkdir -p "$OUTPUT_HOST/${SEQUENCE_ID}/gt"
+  docker run --rm --gpus all --shm-size "64g" \
+    -v "$INPUT_USDZ_HOST":/inputs/usdz \
+    -v "$OUTPUT_HOST":/outputs \
+    "$IMAGE" render \
+      --artifact-path="$container_usdz_path" \
+      --output-dir="$gt_dir" \
+      --renderer default \
+      --image-format "$IMAGE_FORMAT" --frame-step 1 --height 1080 \
+      --camera-id "$CAMERA_ID"
+}
+```
+
+---
+
 ## Option 1: Rig offset (no rig JSON)
 
 Pick `IMAGE` via the discovery snippet below — highest-versioned
@@ -268,19 +297,8 @@ container_usdz_path="/inputs/usdz${found_usdz_path#$INPUT_USDZ_HOST}"
 
 mkdir -p "$OUTPUT_HOST/$SEQUENCE_ID"
 
-# Ground truth — skip if the GT MP4 is already present
-if [ ! -f "$OUTPUT_HOST/$SEQUENCE_ID/gt_${CAMERA_ID}.mp4" ]; then
-  mkdir -p "$OUTPUT_HOST/${SEQUENCE_ID}/gt"
-  docker run --rm --gpus all --shm-size "64g" \
-    -v "$INPUT_USDZ_HOST":/inputs/usdz \
-    -v "$OUTPUT_HOST":/outputs \
-    "$IMAGE" render \
-      --artifact-path="$container_usdz_path" \
-      --output-dir="$gt_dir" \
-      --renderer default \
-      --image-format "$IMAGE_FORMAT" --frame-step 1 --height 1080 \
-      --camera-id "$CAMERA_ID"
-fi
+# Ground truth — uses render_ground_truth() from the shared helper above.
+render_ground_truth
 
 # Adapted — replace the offset values with whatever the user asked for.
 # Translation is (x,y,z) meters, rig frame.
@@ -376,19 +394,8 @@ container_rig_path="/inputs/augmented_rig/$(basename "$AUGMENTED_RIG")"
 
 mkdir -p "$OUTPUT_HOST/$SEQUENCE_ID"
 
-# Ground truth — skip if already present
-if [ ! -f "$OUTPUT_HOST/$SEQUENCE_ID/gt_${CAMERA_ID}.mp4" ]; then
-  mkdir -p "$OUTPUT_HOST/${SEQUENCE_ID}/gt"
-  docker run --rm --gpus all --shm-size "64g" \
-    -v "$INPUT_USDZ_HOST":/inputs/usdz \
-    -v "$OUTPUT_HOST":/outputs \
-    "$IMAGE" render \
-      --artifact-path="$container_usdz_path" \
-      --output-dir="$gt_dir" \
-      --renderer default \
-      --image-format "$IMAGE_FORMAT" --frame-step 1 --height 1080 \
-      --camera-id "$CAMERA_ID"
-fi
+# Ground truth — uses render_ground_truth() from the shared helper above.
+render_ground_truth
 
 # Map the rig onto the scene trajectory.
 #
