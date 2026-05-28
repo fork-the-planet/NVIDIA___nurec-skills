@@ -40,6 +40,13 @@ WARN = "WARN"
 FAIL = "FAIL"
 OK = "OK"
 
+SUBPROCESS_TIMEOUT_S = 15
+MIN_PYTHON_VERSION = (3, 10)
+MIN_DRIVER_MAJOR = 570
+MIN_GCC_MAJOR = 10
+MAX_GCC_MAJOR = 13
+UNEXPECTED_ERROR_EXIT = 2
+
 
 def _run(cmd: list[str]) -> tuple[int, str, str]:
     try:
@@ -48,20 +55,21 @@ def _run(cmd: list[str]) -> tuple[int, str, str]:
             capture_output=True,
             text=True,
             check=False,
-            timeout=15,
+            timeout=SUBPROCESS_TIMEOUT_S,
         )
         return proc.returncode, proc.stdout, proc.stderr
     except FileNotFoundError:
         return 127, "", f"{cmd[0]}: not found"
     except Exception as exc:  # pragma: no cover - defensive
-        return 2, "", f"{cmd[0]}: {exc}"
+        return UNEXPECTED_ERROR_EXIT, "", f"{cmd[0]}: {exc}"
 
 
 def check_python() -> tuple[str, str]:
     major, minor = sys.version_info.major, sys.version_info.minor
     version = f"{major}.{minor}"
-    if (major, minor) < (3, 10):
-        return FAIL, f"Python {version} is too old (need >= 3.10)."
+    min_major, min_minor = MIN_PYTHON_VERSION
+    if (major, minor) < MIN_PYTHON_VERSION:
+        return FAIL, f"Python {version} is too old (need >= {min_major}.{min_minor})."
     return OK, f"Python {version}"
 
 
@@ -76,7 +84,7 @@ def check_conda() -> tuple[str, str]:
 
 def check_driver() -> tuple[str, str]:
     if shutil.which("nvidia-smi") is None:
-        return FAIL, "nvidia-smi not on PATH. Install the NVIDIA driver >= 570."
+        return FAIL, f"nvidia-smi not on PATH. Install the NVIDIA driver >= {MIN_DRIVER_MAJOR}."
     rc, out, err = _run([
         "nvidia-smi",
         "--query-gpu=driver_version",
@@ -89,9 +97,9 @@ def check_driver() -> tuple[str, str]:
     if not match:
         return WARN, f"Could not parse driver version from '{first}'."
     major = int(match.group(1))
-    if major < 570:
+    if major < MIN_DRIVER_MAJOR:
         return FAIL, (
-            f"Driver {first} is too old. CUDA 12.8 needs driver >= 570."
+            f"Driver {first} is too old. CUDA 12.8 needs driver >= {MIN_DRIVER_MAJOR}."
         )
     return OK, f"NVIDIA driver {first}"
 
@@ -107,9 +115,9 @@ def check_gcc() -> tuple[str, str]:
         major = int(version)
     except ValueError:
         return WARN, f"Unexpected gcc version '{out.strip()}'."
-    if major < 10 or major > 13:
+    if major < MIN_GCC_MAJOR or major > MAX_GCC_MAJOR:
         return WARN, (
-            f"gcc {out.strip()} is outside the tested 10-13 range; "
+            f"gcc {out.strip()} is outside the tested {MIN_GCC_MAJOR}-{MAX_GCC_MAJOR} range; "
             "setup.sh will probe for an alternative."
         )
     return OK, f"gcc {out.strip()}"
@@ -150,7 +158,7 @@ def main() -> int:
             status, detail = fn()
         except Exception as exc:  # pragma: no cover - defensive
             print(f"[{FAIL}] {name}: unexpected error: {exc}", file=sys.stderr)
-            return 2
+            return UNEXPECTED_ERROR_EXIT
 
         stream = sys.stdout if status == OK else sys.stderr
         print(f"[{status}] {name}: {detail}", file=stream)

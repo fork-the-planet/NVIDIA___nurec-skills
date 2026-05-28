@@ -46,6 +46,16 @@ OK = "OK"
 WARN = "WARN"
 FAIL = "FAIL"
 
+SUBPROCESS_TIMEOUT_S = 15
+COMMAND_NOT_FOUND_RC = 127
+UNEXPECTED_ERROR_EXIT = 2
+
+MIN_DRIVER_MAJOR_FIXER = 535
+MIN_DRIVER_MAJOR_RECOMMENDED = 570
+MIN_GPU_MEMORY_GB = 24.0
+RECOMMENDED_GPU_MEMORY_GB = 48.0
+MB_PER_GB = 1024.0
+
 
 def _run(cmd: list[str]) -> tuple[int, str, str]:
     try:
@@ -54,13 +64,13 @@ def _run(cmd: list[str]) -> tuple[int, str, str]:
             capture_output=True,
             text=True,
             check=False,
-            timeout=15,
+            timeout=SUBPROCESS_TIMEOUT_S,
         )
         return proc.returncode, proc.stdout, proc.stderr
     except FileNotFoundError:
-        return 127, "", f"{cmd[0]}: not found"
+        return COMMAND_NOT_FOUND_RC, "", f"{cmd[0]}: not found"
     except Exception as exc:  # pragma: no cover - defensive
-        return 2, "", f"{cmd[0]}: {exc}"
+        return UNEXPECTED_ERROR_EXIT, "", f"{cmd[0]}: {exc}"
 
 
 def check_platform() -> tuple[str, str]:
@@ -125,14 +135,15 @@ def check_driver() -> tuple[str, str]:
     if not match:
         return WARN, f"Could not parse driver version from {first!r}."
     major = int(match.group(1))
-    if major < 535:
+    if major < MIN_DRIVER_MAJOR_FIXER:
         return FAIL, (
-            f"Driver {first} is too old. NRE needs R535+ (R570+ recommended)."
+            f"Driver {first} is too old. NRE needs R{MIN_DRIVER_MAJOR_FIXER}+ "
+            f"(R{MIN_DRIVER_MAJOR_RECOMMENDED}+ recommended)."
         )
-    if major < 570:
+    if major < MIN_DRIVER_MAJOR_RECOMMENDED:
         return WARN, (
-            f"Driver {first} works but R570+ is recommended (R580+ on "
-            "Blackwell). Consider upgrading."
+            f"Driver {first} works but R{MIN_DRIVER_MAJOR_RECOMMENDED}+ is "
+            "recommended (R580+ on Blackwell). Consider upgrading."
         )
     return OK, f"NVIDIA driver {first}"
 
@@ -154,16 +165,16 @@ def check_gpu_memory() -> tuple[str, str]:
         sizes_mb = [int(line) for line in lines]
     except ValueError:
         return WARN, f"Unexpected nvidia-smi memory output: {out.strip()!r}"
-    biggest_gb = max(sizes_mb) / 1024.0
-    if biggest_gb < 24.0:
+    biggest_gb = max(sizes_mb) / MB_PER_GB
+    if biggest_gb < MIN_GPU_MEMORY_GB:
         return FAIL, (
-            f"Largest GPU has {biggest_gb:.1f} GB; NRE needs >= 24 GB "
-            "(48+ GB recommended)."
+            f"Largest GPU has {biggest_gb:.1f} GB; NRE needs >= "
+            f"{MIN_GPU_MEMORY_GB:.0f} GB ({RECOMMENDED_GPU_MEMORY_GB:.0f}+ GB recommended)."
         )
-    if biggest_gb < 48.0:
+    if biggest_gb < RECOMMENDED_GPU_MEMORY_GB:
         return WARN, (
-            f"Largest GPU has {biggest_gb:.1f} GB; usable but 48+ GB is "
-            "recommended for AV training."
+            f"Largest GPU has {biggest_gb:.1f} GB; usable but "
+            f"{RECOMMENDED_GPU_MEMORY_GB:.0f}+ GB is recommended for AV training."
         )
     return OK, f"Largest GPU has {biggest_gb:.1f} GB VRAM"
 
@@ -203,7 +214,7 @@ def main() -> int:
             status, detail = fn()
         except Exception as exc:  # pragma: no cover - defensive
             print(f"[{FAIL}] {name}: unexpected error: {exc}", file=sys.stderr)
-            return 2
+            return UNEXPECTED_ERROR_EXIT
         stream = sys.stdout if status == OK else sys.stderr
         print(f"[{status}] {name}: {detail}", file=stream)
         if status == FAIL:

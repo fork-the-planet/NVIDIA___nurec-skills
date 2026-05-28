@@ -30,6 +30,9 @@ from pathlib import Path
 
 MIN_COMPUTE_CAPABILITY = (8, 0)
 MIN_FREE_DISK_GB = 120
+SUBPROCESS_TIMEOUT_S = 30
+BYTES_PER_GB = 1024**3
+UNEXPECTED_ERROR_EXIT = 2
 
 
 def _err(msg: str) -> None:
@@ -69,7 +72,7 @@ def check_nvidia_runtime() -> bool:
             check=False,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=SUBPROCESS_TIMEOUT_S,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         _err(f"could not run `docker info`: {exc}")
@@ -94,7 +97,7 @@ def check_gpu() -> bool:
             check=True,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=SUBPROCESS_TIMEOUT_S,
         )
     except subprocess.CalledProcessError as exc:
         _err(f"nvidia-smi failed: {exc.stderr.strip() or exc}")
@@ -163,7 +166,7 @@ def check_disk_space() -> bool:
     except OSError as exc:
         _err(f"could not check free disk: {exc}")
         return False
-    free_gb = free_bytes / (1024**3)
+    free_gb = free_bytes / BYTES_PER_GB
     if free_gb < MIN_FREE_DISK_GB:
         _err(f"only {free_gb:.1f} GB free in {cwd}; recommend >= {MIN_FREE_DISK_GB} GB")
         return False
@@ -215,4 +218,4 @@ if __name__ == "__main__":
         raise
     except Exception as exc:  # noqa: BLE001
         print(f"[ERROR] unexpected failure: {exc}", file=sys.stderr)
-        raise SystemExit(2)
+        raise SystemExit(UNEXPECTED_ERROR_EXIT)

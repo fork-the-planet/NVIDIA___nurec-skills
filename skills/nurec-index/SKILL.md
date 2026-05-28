@@ -1,21 +1,12 @@
 ---
 name: nurec-index
 description: >-
-  Use when a user mentions NVIDIA NuRec, Neural Reconstruction Engine
-  (NRE), 3DGUT/3DGRT, USDZ scenes, NCore V4 conversion, asset
-  harvesting, or rendered-frame cleanup but the correct sibling skill
-  (nre, ncore, asset-harvester, nurec-fixer, physical-ai-datasets) is
-  not yet obvious — this router classifies the request, maps it to a
-  goal-based table, and hands off to exactly one sibling. Use for
-  multi-stage NuRec pipelines (convert + train + render, dataset +
-  render, harvest + insert, render + harmonize) where you need to
-  pick the right starting skill and walk the workflow in order. Do
-  NOT use when the right sub-skill is already obvious (open it
-  directly); Do NOT use for non-NuRec tasks; Do NOT use to run any
-  container, training, rendering, conversion, download, or teardown
-  itself — this skill is read-only routing and always defers
-  execution to the sibling it points to.
-version: "0.2.3"
+  Router for NVIDIA NuRec / NRE / 3DGUT / USDZ / NCore V4 / asset
+  harvest / frame cleanup tasks — picks the right sibling (nre,
+  ncore, asset-harvester, nurec-fixer, physical-ai-datasets). Use
+  when the sub-skill is unclear or a multi-stage pipeline is needed;
+  do NOT use for non-NuRec tasks or to run any pipeline itself.
+version: "0.2.4"
 tools:
   - Read
 license: CC-BY-4.0 AND Apache-2.0
