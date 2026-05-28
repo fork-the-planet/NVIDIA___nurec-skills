@@ -96,7 +96,7 @@ frames over a network API.
    actors and the built-in Fixer.
 3. For a Python driver loop without a full simulator, `nre` ships a
    thin host-side gRPC client
-   (`references/NRE_RenderClient/SKILL.md`,
+   (`references/NRE_RenderClient/README.md`,
    `scripts/session_warm_server.sh`, `thin_client.py`,
    `batch_render_rgb`) that keeps one warm `serve-grpc` container
    up for the session and avoids the per-call Docker / Python /

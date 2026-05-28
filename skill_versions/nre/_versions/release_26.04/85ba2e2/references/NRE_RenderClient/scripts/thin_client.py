@@ -5,7 +5,7 @@ Skill: NRE_RenderClient (physical-ai-skills). Talks to a warm
 serve-grpc server over its gRPC port directly, with no per-call
 client-container cold-start (no per-call `docker run` boot, Python
 interpreter startup, or CUDA context init in a client container).
-See `SKILL.md` next to this script for the full picture.
+See `README.md` next to this script for the full picture.
 
 Architecture (mirrors pacsim's nre_provider.NrePythonProvider, simplified):
 

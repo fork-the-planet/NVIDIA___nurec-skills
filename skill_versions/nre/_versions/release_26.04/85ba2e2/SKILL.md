@@ -244,7 +244,7 @@ Pick the smallest backend that exposes the requested feature:
   render-heavy RGB sessions where repeated Docker/Python/CUDA
   cold-start dominates latency, or where multiple cameras should be
   rendered through one `batch_render_rgb` RPC. Read
-  `references/NRE_RenderClient/SKILL.md` and use
+  `references/NRE_RenderClient/README.md` and use
   `scripts/session_warm_server.sh` / `scripts/session_teardown.sh`.
 - **OSMO / cluster workflows.** Use the templates under
   `references/example-workflows/osmo/` for multi-clip fan-out,
@@ -311,7 +311,7 @@ flag-level or workflow-specific detail in the companion files.
 - `references/local-render.md` — host-side `docker run ... render`
   recipes for rig offsets and `export-custom-rig-trajectory` bakes,
   including measured wall times and pre-baked trajectory-cache rules.
-- `references/NRE_RenderClient/SKILL.md` — warm-server thin Python
+- `references/NRE_RenderClient/README.md` — warm-server thin Python
   gRPC client, `setup_protos.sh`, `thin_client.py`, `batch_render_rgb`,
   runtime scene loading, rig-file overrides, and limitations.
 - `references/grpc-api.md` — sensorsim gRPC server flags + Python

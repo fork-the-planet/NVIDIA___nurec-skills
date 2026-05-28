@@ -524,7 +524,7 @@ its references:
 
 ```
 <nre-skill-dir>/references/NRE_RenderClient/
-  SKILL.md                          # this file
+  README.md                         # this file
   scripts/
     thin_client.py                  # the host-side gRPC client
     setup_protos.sh                 # extract gRPC stubs from the NRE Docker image
