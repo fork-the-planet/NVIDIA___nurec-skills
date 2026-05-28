@@ -14,9 +14,10 @@ description: >-
   nurec index, nurec router, neural reconstruction engine, NRE,
   3DGUT, 3DGRT, USDZ, sensorsim, novel view synthesis,
   PhysicalAI-Autonomous-Vehicles-NuRec, NuRec end-to-end, NuRec
-  pipeline, NuRec workflow, getting started with NuRec, nurec
-  teardown, cleanup.
-version: "0.2.0"
+  pipeline, NuRec workflow, getting started with NuRec, warm
+  serve-grpc, nre thin client, batch_render_rgb, nurec teardown,
+  cleanup.
+version: "0.2.1"
 tools:
   - Read
 license: CC-BY-4.0 AND Apache-2.0
@@ -128,6 +129,7 @@ right. Arrows mean "do these in order".
 | Render at full resolution / highest quality | `nre` (see "Quality presets" inside that skill) |
 | Render along a **shifted** trajectory (e.g. car moved 3 m to the left) | `nre` |
 | Render through a server so a simulator (CARLA, Isaac Sim, your own) can ask for frames | `nre` (`serve-grpc`) |
+| Render the same USDZ many times back-to-back from Python with minimal per-call latency (interactive chat loop, multi-camera turn) | `nre` (warm `serve-grpc` + thin Python client / `batch_render_rgb`) |
 | Render LiDAR sweeps (point clouds) from a USDZ | `nre` (`render-grpc --lidar`) |
 | Skip training and just render a NuRec scene that NVIDIA already built (driving logs) | `physical-ai-datasets` → `nre` |
 | Skip training and use a pre-built indoor robotics scene | `physical-ai-datasets` → `nre` (then Isaac Sim 5.1) |
@@ -157,8 +159,11 @@ Use this when the user has a fresh sensor log and wants a renderable
    Waymo, NuScenes, PandaSet, COLMAP, ScanNet++); for anything else,
    it walks you through writing a new converter.
 2. `nre` — generate the extra inputs (depth, segmentation, ego
-   mask), then train and validate. Out comes a USDZ. Render it
-   locally, or hand it to a simulator over the gRPC API.
+   mask), then train and validate. Out comes a USDZ. Render it three
+   ways: with the local `nre render` CLI; with a warm `serve-grpc`
+   server driven by the bundled thin Python gRPC client
+   (`batch_render_rgb` for repeated / multi-camera renders); or by
+   handing the USDZ to a simulator over the public gRPC API.
 
 ### B. Use a NuRec scene NVIDIA has already trained
 
@@ -232,7 +237,14 @@ frames over a network API.
    it a camera position and a timestamp; NRE sends back an image (or
    a LiDAR sweep). The server also supports adding / removing
    actors and the built-in Fixer.
-3. If you're writing a new client and need to convert between map
+3. If you don't already have a simulator and just want a Python
+   driver loop, `nre` ships a thin host-side gRPC client
+   (`references/NRE_RenderClient/SKILL.md`,
+   `scripts/session_warm_server.sh`, `thin_client.py`,
+   `batch_render_rgb`) that keeps one warm `serve-grpc` container up
+   for the session and avoids the per-call Docker / Python / CUDA
+   cold start.
+4. If you're writing a new client and need to convert between map
    coordinates and NuRec's coordinate system, `nre` has a recipe
    for it in its `physical-ai-render` reference.
 
