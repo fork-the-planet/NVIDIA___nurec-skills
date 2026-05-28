@@ -478,7 +478,7 @@ flags below to `serve-grpc`:
 ```
 
 For the newer Cosmos-based Fixer variants distributed as a separate
-inference container, use the [nurec-fixer](../nurec-fixer/SKILL.md)
+inference container, use the `nurec-fixer`
 skill — that pipeline runs out-of-band on a directory of frames.
 
 ## 8. Common operational tips

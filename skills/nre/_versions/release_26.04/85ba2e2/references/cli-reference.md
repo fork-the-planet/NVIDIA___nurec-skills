@@ -911,7 +911,7 @@ loop. Run `--help` for the full flag list.
   documented in `references/aux-data.md`.
 - **`asset-harvester`** sub-command: invokes the Asset Harvester
   pipeline inside the tools container (described in
-  [asset-harvester](../asset-harvester/SKILL.md)).
+  `asset-harvester`).
 
 ### NuRec Auxiliary Data
 
@@ -933,7 +933,7 @@ of each auxiliary-data type.
 
 ### `asset-harvester` sub-command
 
-Runs the [asset-harvester](../asset-harvester/SKILL.md) pipeline from
+Runs the `asset-harvester` pipeline from
 inside `nre-tools`. The default config path inside the container is
 `configs/experimental/asset_harvesting/harvest.yaml`.
 

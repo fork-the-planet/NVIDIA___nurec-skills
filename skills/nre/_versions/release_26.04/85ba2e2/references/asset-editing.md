@@ -48,7 +48,7 @@ gRPC API exposes.
 - Asset-Harvester output at `<AH_OUTPUT_DIR>/`, containing per-asset
   `<track_id>/<track_id>.ply` (or `<track_id>/gs.ply`) files plus a
   top-level `metadata.yaml` — see the
-  [asset-harvester](../asset-harvester/SKILL.md) skill.
+  `asset-harvester` skill.
 - `nvcr.io/nvidia/nre/nre:latest` pulled and `NGC_API_KEY` exported.
 
 The `metadata.yaml` produced by Asset Harvester has the shape:

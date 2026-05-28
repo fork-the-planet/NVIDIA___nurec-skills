@@ -294,7 +294,7 @@ docker run --shm-size=2g -it --rm --gpus all \
 ## Asset Harvester sub-command on the same container
 
 The same `nre-tools` image also exposes the
-[asset-harvester](../asset-harvester/SKILL.md) pipeline as a
+`asset-harvester` pipeline as a
 sub-command, which downloads its own model checkpoints from NGC on
 first run and caches them under `/cache`:
 

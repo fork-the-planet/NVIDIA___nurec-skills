@@ -1,0 +1,10 @@
+home: ${env:HOME} # how is the home directory on your system called
+repo_dir: "{home}/dev/nurec-workflows"
+local_dir: "{repo_dir}/local"
+bin_dir: "{local_dir}/bin"
+config_dir: "{repo_dir}/configs"
+scripts_dir: "{repo_dir}/scripts"
+input_dir: "{local_dir}/input"
+temp_dir: "{local_dir}/temp"
+results_dir: "{local_dir}/results"
+dependencies_dir: "{local_dir}/dependencies"

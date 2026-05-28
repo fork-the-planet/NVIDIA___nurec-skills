@@ -5,18 +5,18 @@ description: >-
   Reconstruction Engine (NRE) on Linux x86_64 + NVIDIA GPU: train a
   3DGUT Gaussian reconstruction from an NCore camera+LiDAR clip via a
   Hydra recipe like 3dgut_dynamic.yaml, generate aux data via
-  nre-tools, render frames locally or through `serve-grpc` /
-  `render-grpc`, export PLY / depth / mesh / ego mask / tracks,
-  repackage Asset Harvester output into a USDZ, or evaluate rendering
-  metrics. Use ONLY through the public NGC containers
-  nvcr.io/nvidia/nre/nre and nvcr.io/nvidia/nre/nre-tools with an
-  NGC_API_KEY; never clone the source. Do NOT use for per-object 3D
-  asset capture (use `asset-harvester`) or sensor-data conversion to
-  NCore (use `ncore`). Trigger keywords: nre, NRE, neural
-  reconstruction engine, nurec, NuRec, Omniverse NuRec, 3DGUT, 3DGRT,
-  3dgut_dynamic.yaml, export-gaussian-plys, export-mesh,
-  export-ncore-tracks, export-external-assets, eval-rendering-metrics,
-  render-grpc, serve-grpc, nre-tools, USDZ.
+  nre-tools, render frames locally with `nre render`, run a warm
+  `serve-grpc` server plus host-side thin Python client, export PLY /
+  depth / mesh / ego mask / tracks, repackage Asset Harvester output
+  into a USDZ, or evaluate rendering metrics. Use ONLY through the
+  public NGC containers nvcr.io/nvidia/nre/nre and
+  nvcr.io/nvidia/nre/nre-tools with an NGC_API_KEY; never clone the
+  source. Do NOT use for per-object 3D asset capture (use
+  `asset-harvester`) or sensor-data conversion to NCore (use `ncore`).
+  Trigger keywords: nre, NRE, neural reconstruction engine, nurec,
+  NuRec, Omniverse NuRec, 3DGUT, 3DGRT, 3dgut_dynamic.yaml,
+  export-gaussian-plys, export-custom-rig-trajectory, render-grpc,
+  serve-grpc, nre thin client, warm nre server, nre-tools, USDZ.
 version: "0.2.0"
 tools:
   - Shell
@@ -66,6 +66,13 @@ views (locally or via gRPC), generate aux data, export
 PLY/depth/mesh/ego-mask/tracks, package Asset Harvester output into a
 USDZ, and evaluate rendering metrics.
 
+This skill also carries the host-side toolkit around the NRE CLI:
+NGC credential resolution, cached-image/version notes, local render
+recipes, MP4 encoding, warm `serve-grpc` boot/teardown scripts, a
+thin Python gRPC client for repeated RGB renders, bundled rig JSONs,
+pre-baked custom-rig trajectories, and bash / Hydra / OSMO workflow
+templates.
+
 **Use this skill when:** the user has an NCore V4 clip (or a USDZ +
 NRE artifact pair) on a Linux x86_64 host with an NVIDIA GPU and an
 NGC API key, and wants to train, render, or export with NRE.
@@ -81,10 +88,10 @@ NGC API key, and wants to train, render, or export with NRE.
 
 ## Table of Contents
 
-- [When to Use](#when-to-use) · [When NOT to Use](#when-not-to-use) · [Inputs](#inputs) · [Instructions](#instructions) · [Output Format](#output-format)
+- [When to Use](#when-to-use) · [When NOT to Use](#when-not-to-use) · [Inputs](#inputs) · [Instructions](#instructions) · [Backend Selection](#backend-selection) · [Output Format](#output-format)
 - [Scripts](#scripts) · [References](#references) · [Prerequisites](#prerequisites) · [Verifying secrets safely](#verifying-secrets-safely)
 - [Limitations](#limitations) · [Troubleshooting](#troubleshooting)
-- [Overview](#overview) · [Install — Docker / NGC container](#install--docker--ngc-container) · [CLI cookbook](#cli-cookbook)
+- [Overview](#overview) · [Install — Docker / NGC container](#install--docker--ngc-container) · [Warm-Server Thin Client Quick Start](#warm-server-thin-client-quick-start) · [CLI cookbook](#cli-cookbook)
 - [End-to-end workflows](#end-to-end-workflows) — A (NCore → reconstruction → render), B (Physical AI dataset), C (Asset-Harvester actors), D (multi-GPU), E (resume), F (upgrade-artifact), G (LiDAR sweeps), H (viewer), I (eval)
 - [Teardown](#teardown)
 
@@ -128,14 +135,14 @@ NGC API key, and wants to train, render, or export with NRE.
 ### When NOT to Use
 
 - For ingesting raw sensor data into NCore (camera/LiDAR conversion,
-  rig calibration) — use the [ncore](../ncore/SKILL.md) skill first;
+  rig calibration) — use the `ncore` skill first;
   NRE consumes already-NCore-formatted shards.
 - For harvesting per-object 3D Gaussian assets from sparse views — use
-  [asset-harvester](../asset-harvester/SKILL.md); NRE only *consumes*
+  `asset-harvester`; NRE only *consumes*
   Asset Harvester outputs via `export-external-assets`.
 - For pure post-processing of rendered frames into harmonised /
   temporally-stable images using the standalone Cosmos-based Fixer —
-  use [nurec-fixer](../nurec-fixer/SKILL.md). NRE's `--enable-difix`
+  use `nurec-fixer`. NRE's `--enable-difix`
   flag invokes a built-in Difix variant (Cosmos by default since
   25.09; the Stable-Diffusion variant is still available via
   `difix=sd_difix`).
@@ -196,15 +203,21 @@ NGC API key, and wants to train, render, or export with NRE.
    (`export-gaussian-plys`, `export-mesh`, `export-ground-mesh`,
    `export-ego-mask`, `export-depth`, `export-sequence-tracks`,
    `export-ncore-tracks`, …) — see `references/cli-reference.md`.
-7. **Render novel views.** Two options:
-   - **Local** — `nre render --artifact-path <usdz> --output-dir <dir>`
-     produces frames on disk along the training trajectory or a
-     `--custom-rig-trajectory`, with optional `--rig-translation-offset`
-     / `--rig-rotation-offset`. No gRPC server required.
-   - **Remote** — `serve-grpc` + `render-grpc` (or your own client via
-     `nre.grpc.protos`). Use this when integrating with a simulator,
-     for LiDAR rendering, or when applying `--edit-assets`. See
-     `references/grpc-api.md` and `references/physical-ai-render.md`.
+7. **Render novel views.** Choose the backend by latency and feature
+   needs:
+   - **Local CLI** — `nre render --artifact-path <usdz> --output-dir
+     <dir>` writes frames on disk along the training trajectory, with
+     optional `--rig-translation-offset` / `--rig-rotation-offset` or a
+     `--custom-rig-trajectory`. No gRPC server required; see
+     `references/local-render.md`.
+   - **Warm RGB service** — boot `serve-grpc` once with
+     `scripts/session_warm_server.sh`, extract protobuf stubs, and use
+     `references/NRE_RenderClient/scripts/thin_client.py` for repeated
+     single-camera or `batch_render_rgb` calls.
+   - **Remote CLI / simulator integration** — `serve-grpc` +
+     `render-grpc` (or your own client via `nre.grpc.protos`). Use this
+     for LiDAR rendering, simulator loops, Difix, or `--edit-assets`.
+     See `references/grpc-api.md` and `references/physical-ai-render.md`.
 8. **Edit actors (optional).** To swap, remove, or insert assets, run
    `export-external-assets` to repackage Asset-Harvester output into
    a new USDZ, then pass the produced `edit-assets.json` to
@@ -216,6 +229,33 @@ NGC API key, and wants to train, render, or export with NRE.
    For more thorough metrics use `eval-rendering-metrics` against the
    ground-truth folder layout produced by `export-ncore-benchmark-gt`.
    Tear down any gRPC server (`Ctrl-C` or `docker rm -f`).
+
+## Backend Selection
+
+Pick the smallest backend that exposes the requested feature:
+
+- **Local Docker, single command.** Use `nre render`, `render-grpc`, or
+  an export sub-command directly. This is simplest for one-off renders,
+  LiDAR sweeps, actor edits, rolling shutter, in-container video
+  export, or exact `--replicate-training-views` behavior. Read
+  `references/local-render.md`, `references/nre-image-notes.md`, and
+  `references/mp4-encoding.md` before adapting the command.
+- **Local Docker, warm `serve-grpc` + thin host client.** Use this for
+  render-heavy RGB sessions where repeated Docker/Python/CUDA
+  cold-start dominates latency, or where multiple cameras should be
+  rendered through one `batch_render_rgb` RPC. Read
+  `references/NRE_RenderClient/SKILL.md` and use
+  `scripts/session_warm_server.sh` / `scripts/session_teardown.sh`.
+- **OSMO / cluster workflows.** Use the templates under
+  `references/example-workflows/osmo/` for multi-clip fan-out,
+  isolation from the local machine, or training jobs that should not
+  run on the user's workstation. Follow `references/ngc-and-registry.md`
+  for registry credentials and `references/long-running-tasks.md` for
+  polling discipline.
+
+For any NRE task expected to run 5 minutes or longer, follow
+`references/long-running-tasks.md`: delegate the job, run it in the
+background, and report compact status at least every 5 minutes.
 
 ## Output Format
 
@@ -244,8 +284,13 @@ NRE container (no JSON state file required from the agent):
 | Script | Purpose | Usage |
 |--------|---------|-------|
 | `scripts/validate_setup.py` | Verify Docker, NVIDIA Container Toolkit, GPU/driver R570+ (R535+ minimum), NGC login, and `NGC_API_KEY` env var. No network calls. | Execute: `python scripts/validate_setup.py [--strict]` |
+| `scripts/session_warm_server.sh` | Idempotently boot a session-scoped `nre serve-grpc` container for the thin Python client. Discovers a cached 26.04+ renderer image, mounts the USDZ root, and waits for readiness. | Execute: `NRE_GRPC_USDZ_HOST_DIR=/path/to/usdz/root bash scripts/session_warm_server.sh` |
+| `scripts/session_teardown.sh` | Stop and remove the warm `serve-grpc` container and clear its state file without racing the next boot. | Execute: `bash scripts/session_teardown.sh` |
 
 ## References
+
+Read these on demand; keep `SKILL.md` as the routing layer and put
+flag-level or workflow-specific detail in the companion files.
 
 - `references/cli-reference.md` — full sub-command surface of the NRE
   container (training, validation, `render`, `serve-grpc`,
@@ -258,22 +303,49 @@ NRE container (no JSON state file required from the agent):
   Waymo / NV / PandaSet / Tesla / Alpasim, plus the override matrix
   for `dataset`, `trainer`, `model`, `loss`, `difix`, `system`,
   `checkpoint`, `viewer`, `profiling`, `scopedtimer`, the multi-GPU
-  / SLURM cookbook, novel-view synthesis, the resume cookbook, and
-  the environment-variable reference (`NGC_API_KEY`,
-  `CUDA_VISIBLE_DEVICES`, `NRE_ENV_RUN_ID`, `CUDA_SYNC_DEBUG`,
-  `PYTORCH_CUDA_ALLOC_CONF`, `WANDB_MODE`, `HF_TOKEN`).
+  / SLURM cookbook, novel-view synthesis, resume, and environment
+  variables.
 - `references/aux-data.md` — `nre-tools` auxiliary-data CLI options
   (Mask2Former, DepthAnythingV2, DINOv2, LiDAR seg/visibility, ego
   mask).
+- `references/local-render.md` — host-side `docker run ... render`
+  recipes for rig offsets and `export-custom-rig-trajectory` bakes,
+  including measured wall times and pre-baked trajectory-cache rules.
+- `references/NRE_RenderClient/SKILL.md` — warm-server thin Python
+  gRPC client, `setup_protos.sh`, `thin_client.py`, `batch_render_rgb`,
+  runtime scene loading, rig-file overrides, and limitations.
 - `references/grpc-api.md` — sensorsim gRPC server flags + Python
   client cookbook (`nre.grpc.protos.sensorsim_pb2_grpc`,
   `RGBRenderRequest`, `LidarRenderRequest`, `--enable-difix` flow).
+- `references/nre-image-notes.md` — cached-image discovery, 26.04+
+  vs 26.03 vs pre-26.03 flag selection, `--renderer default`, JPEG
+  defaults, rig-rotation convention, and common CLI gotchas.
+- `references/ngc-and-registry.md` — NGC API key resolution,
+  `docker login nvcr.io`, and OSMO registry credential pointers.
+- `references/mp4-encoding.md` — host-side ffmpeg recipe, in-container
+  `--export-video` caveats, and required `gt_camera_<id>.mp4` /
+  `camera_<id>.mp4` filenames for comparison viewers.
 - `references/asset-editing.md` — `export-external-assets` +
   `edit-assets.json` schema + `render-grpc --edit-assets` to remove,
   replace, and insert actors.
 - `references/physical-ai-render.md` — end-to-end recipe for rendering
   the HuggingFace `nvidia/PhysicalAI-Autonomous-Vehicles-NuRec`
   dataset, including NuRec ↔ ECEF ↔ ENU coordinate transforms.
+- `references/example-workflows/` — bash, Hydra, and OSMO templates for
+  PAI/NCore/NuRec workflows, USDZ export, `serve-grpc`, and local or
+  cluster rendering. Treat them as templates and generate fresh files
+  for user-specific paths.
+- `references/rig-json/` — bundled `rig.json` and
+  `augmented_rig.json` for fallback/demo renders when the caller has
+  not supplied a rig directory.
+- `references/custom-rig-trajectories/` — pre-baked
+  `export-custom-rig-trajectory` outputs keyed by clip UUID prefix for
+  the bundled augmented rig and canonical PAI demo clips.
+- `references/long-running-tasks.md` — subagent/background-job and
+  5-minute status reporting convention for training, OSMO jobs,
+  multi-clip renders, large downloads, and other long tasks.
+- `references/nurec-skill-catalog.md` — routing table for sibling
+  NuRec-stack skills in the canonical `NVIDIA/nurec-skills` repo.
 - `references/teardown.md` — full inventory of images, caches, and
   outputs the workflow leaves behind, ownership-recovery commands,
   and post-teardown verification.
@@ -368,7 +440,7 @@ suspect a token was echoed, rotate it at
   artifacts that pre-date them (e.g. 25.07 broke 25.06 data); see
   release notes when mixing client / server versions.
 - **Asset-Harvester input only.** `export-external-assets` requires
-  outputs from the [asset-harvester](../asset-harvester/SKILL.md)
+  outputs from the `asset-harvester`
   pipeline; raw `.ply` files alone won't carry the per-asset cuboid
   metadata.
 - **Difix variants are pluggable.** The container ships both the
@@ -376,7 +448,7 @@ suspect a token was echoed, rotate it at
   and the legacy Stable-Diffusion variant
   (`difix=sd_difix`). The newer Cosmos-Predict-based Fixer variants
   with their own inference container live in the
-  [nurec-fixer](../nurec-fixer/SKILL.md) skill — that pipeline runs
+  `nurec-fixer` skill — that pipeline runs
   out-of-band on a directory of frames.
 - **`render` ↔ `render-grpc` overlap.** `render` runs in-container
   without a server; `render-grpc` requires an active `serve-grpc`
@@ -452,10 +524,10 @@ In the broader Physical-AI stack:
    CARLA / AlpaSim / Isaac Sim / custom client
 ```
 
-NRE pairs cleanly with the [ncore](../ncore/SKILL.md) skill (data
-ingest), the [asset-harvester](../asset-harvester/SKILL.md) skill
+NRE pairs cleanly with the `ncore` skill (data
+ingest), the `asset-harvester` skill
 (per-object Gaussian assets), and the
-[nurec-fixer](../nurec-fixer/SKILL.md) skill (artifact harmonisation
+`nurec-fixer` skill (artifact harmonisation
 of rendered novel views).
 
 ## Install — Docker / NGC container
@@ -476,6 +548,39 @@ docker pull nvcr.io/nvidia/nre/nre-tools:latest    # aux data + asset-harvester 
 
 The container expects two host bind mounts: dataset (read-only is OK
 once you've generated aux data) and output (read-write).
+
+## Warm-Server Thin Client Quick Start
+
+Use this path when a session will render the same USDZ repeatedly or
+render several cameras per pose. It keeps one `serve-grpc` container
+alive and calls it from host-side Python.
+
+```bash
+# 1. Authenticate to NGC once per host; see references/ngc-and-registry.md.
+NGC_KEY="${NGC_CLI_API_KEY:-${NGC_API_KEY:-}}"
+echo "$NGC_KEY" | docker login nvcr.io -u '$oauthtoken' --password-stdin
+
+# 2. Extract protobuf stubs from the cached NRE image.
+bash references/NRE_RenderClient/scripts/setup_protos.sh
+
+# 3. Boot the warm server. NRE_GRPC_USDZ_HOST_DIR is the host root that
+#    contains one or more USDZ files.
+NRE_GRPC_USDZ_HOST_DIR=/path/to/usdz/root \
+  bash scripts/session_warm_server.sh
+
+# 4. Render one or more cameras with the thin client.
+python3 references/NRE_RenderClient/scripts/thin_client.py \
+  --cameras camera_front_wide_120fov \
+  --rig-file references/rig-json/augmented_rig.json \
+  --output-dir /tmp/nre-out/turn-001
+
+# 5. Encode frames to MP4 if needed, then tear down at session end.
+bash scripts/session_teardown.sh
+```
+
+Use the local `nre render` CLI instead when the turn needs LiDAR,
+actor edits, rolling shutter, arbitrary custom ego trajectories, or
+features the thin client deliberately leaves to the NRE container CLI.
 
 ## CLI cookbook
 
@@ -658,7 +763,7 @@ conversion (NuRec ↔ ECEF ↔ OpenDRIVE ENU) lives in
 
 ### Workflow C — Insert Asset-Harvester actors into a USDZ
 
-1. Run [asset-harvester](../asset-harvester/SKILL.md) on the relevant
+1. Run `asset-harvester` on the relevant
    `track_ids` from the source NCore clip to produce a directory of
    `.ply` + `metadata.yaml` per asset.
 2. `export-external-assets` to repackage the AH directory into a new
