@@ -66,7 +66,8 @@ osmo-cli canonical form.
 
 ## When to ask the user
 
-Only ask for the API key if both env vars are empty. When you do,
-mention https://ngc.nvidia.com/setup/api-key and stop work until the
-key is provided — there is no useful fallback: the image is private
+Only ask for the API key if both env vars are empty, if the needed assets 
+are not already preloaded, or after trying to pull and getting an authorization 
+denied error. When you do, mention https://ngc.nvidia.com/setup/api-key and stop 
+work until the key is provided — there is no useful fallback: the image is private
 and cannot be pulled anonymously.
