@@ -132,7 +132,6 @@ workflow:
         --height={{render_height}}
         --frame-step=1
         --frame-naming=frame-end-timestamp
-        --renderer=nrend
       )
 
       IS_NOVEL_VIEW=0
