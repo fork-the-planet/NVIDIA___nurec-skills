@@ -21,7 +21,7 @@ default-values:
   release: "26.02_release"
   # UUID must exist under sample_set/<release>/ in $hf_dataset; override
   # via workflow params for any other clip.
-  clip_id: "048b974e-1546-488a-b8f9-d32bff77f5aa"
+  clip_id: "0fd06bc3-1899-4b45-9278-c5c018b3968d" # change with clip id you want to render
   camera_to_render: "camera_front_wide_120fov"
   # nre/nre:latest is deprecated; nre-ga is the public NGC home of the GA build.
   nre_image: "nvcr.io/nvidia/nre/nre-ga:latest"
