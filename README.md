@@ -26,49 +26,57 @@ the NuRec stack.
 
 ## Skills in this repo
 
-Start with [`nurec-index`](./.agents/skills/SKILL.md) — it routes any
-NuRec task to the right sibling skill below.
+Start with [`nurec-index`](./.agents/skills/nurec-index/SKILL.md) — it
+routes any NuRec task to the right sibling skill below.
 
-| Name | Folder | Pinned version | Purpose |
-|------|--------|----------------|---------|
-| [`nurec-index`](./.agents/skills/SKILL.md) | `.agents/skills/` | hand-curated | Router. Read first. Picks the right skill for any NuRec task. |
+| Name | Folder | Pinned upstream | Purpose |
+|------|--------|-----------------|---------|
+| [`nurec-index`](./.agents/skills/nurec-index/SKILL.md) | `.agents/skills/nurec-index/` | hand-curated | Router. Read first. Picks the right skill for any NuRec task. |
 | [`physical-ai-datasets`](./.agents/skills/physical-ai-datasets/SKILL.md) | `.agents/skills/physical-ai-datasets/` | hand-curated | Catalog of every NVIDIA `PhysicalAI-*` dataset on Hugging Face — AV, robotics, NuRec scenes, benchmarks. |
 | [`ncore`](./.agents/skills/ncore/SKILL.md) | `.agents/skills/ncore/` | upstream `2026.04` | Convert any sensor recording (cameras, LiDAR, radar, IMU, depth, stereo) into [NCore V4](https://github.com/NVIDIA/ncore) — the format NRE consumes. Includes a converter template. |
-| [`nre`](./.agents/skills/nre/SKILL.md) | `.agents/skills/nre/_versions/release_26.04/85ba2e2/` | NRE `release_26.04` | Train 3DGUT/3DGRT Gaussian reconstructions, render novel views (local or via gRPC), export PLY/mesh/depth, edit actors, evaluate quality. Drives the public `nvcr.io/nvidia/nre/{nre,nre-tools}` containers. |
-| [`asset-harvester`](./.agents/skills/asset-harvester/SKILL.md) | `.agents/skills/asset-harvester/_versions/main/e08b1b2/` | upstream `main` @ `e08b1b2` | Extract per-object 3D Gaussian Splat assets from sparse AV-clip views via SparseViewDiT + TokenGS. Open-source ([NVIDIA/asset-harvester](https://github.com/NVIDIA/asset-harvester), Apache-2.0). |
-| [`nurec-fixer`](./.agents/skills/nurec-fixer/SKILL.md) | `.agents/skills/nurec-fixer/_versions/main/617a990/` | DiffusionHarmonizer release branches @ `54596de` / `2422370` / `3616343` | Post-process, evaluate, or fine-tune novel-view renders with NVIDIA DiffusionHarmonizer, the current public harmonizer for reconstruction artifacts and inserted-object appearance. |
+| [`nre`](./.agents/skills/nre/SKILL.md) | `.agents/skills/nre/` | NRE `release_26.04` (`nvcr.io/nvidia/nre/{nre,nre-tools}`) | Train 3DGUT/3DGRT Gaussian reconstructions, render novel views (local or via gRPC), export PLY/mesh/depth, edit actors, evaluate quality. |
+| [`asset-harvester`](./.agents/skills/asset-harvester/SKILL.md) | `.agents/skills/asset-harvester/` | [`NVIDIA/asset-harvester`](https://github.com/NVIDIA/asset-harvester) `main` (Apache-2.0) | Extract per-object 3D Gaussian Splat assets from sparse AV-clip views via SparseViewDiT + TokenGS. |
+| [`nurec-fixer`](./.agents/skills/nurec-fixer/SKILL.md) | `.agents/skills/nurec-fixer/` | [`nvidia/DiffusionHarmonizer`](https://huggingface.co/nvidia/DiffusionHarmonizer) + [`NVIDIA/harmonizer`](https://github.com/NVIDIA/harmonizer) | Post-process, evaluate, or fine-tune novel-view renders with NVIDIA DiffusionHarmonizer, the current public harmonizer for reconstruction artifacts and inserted-object appearance. |
 
 ## Repo layout
 
 ```text
-.agents/
-└── skills/
-    ├── SKILL.md                      # The nurec-index router
-    ├── physical-ai-datasets/
-    │   └── SKILL.md
-    ├── ncore/
-    │   ├── SKILL.md
-    │   └── ncore_template/           # Converter scaffold for new sensor formats
-    ├── nre/
-    │   ├── SKILL.md            ──►  _versions/release_26.04/85ba2e2/SKILL.md
-    │   ├── references/         ──►  _versions/release_26.04/85ba2e2/references/
-    │   ├── scripts/            ──►  _versions/release_26.04/85ba2e2/scripts/
-    │   └── _versions/release_26.04/85ba2e2/
-    │       ├── SKILL.md
-    │       ├── references/
-    │       └── scripts/
-    ├── asset-harvester/
-    │   └── _versions/main/e08b1b2/   # Same shape; symlinks at the parent
-    └── nurec-fixer/
-        └── _versions/main/617a990/   # Same shape; symlinks at the parent
+.agents/skills/  ──►  skills/                # symlink; both paths resolve to the same tree
+skills/
+├── nurec-index/
+│   ├── SKILL.md                             # The router. Read first.
+│   └── references/
+│       ├── workflows.md
+│       ├── teardown.md
+│       └── discovery.md
+├── physical-ai-datasets/
+│   └── SKILL.md
+├── ncore/
+│   ├── SKILL.md
+│   └── ncore_template/                      # Converter scaffold for new sensor formats
+├── nre/
+│   ├── SKILL.md
+│   ├── references/                          # CLI / configuration / cookbook / rig JSONs / etc.
+│   └── scripts/                             # validate_setup.py, session_warm_server.sh, …
+├── asset-harvester/
+│   ├── SKILL.md
+│   ├── references/
+│   ├── scripts/
+│   └── tests.yaml
+└── nurec-fixer/
+    ├── SKILL.md
+    ├── references/
+    ├── scripts/
+    └── tests.yaml
 ```
 
-Skills that wrap a specific upstream commit pin that commit under
-`<skill>/_versions/<branch>/<commit>/`. Symlinks at the skill root
-(`<skill>/SKILL.md`, `references/`, `scripts/`, `tests.yaml`) point at
-the currently-selected version, so cross-skill markdown links like
-`../nre/SKILL.md` keep resolving when an agent navigates the symlinked
-paths.
+Each skill is a flat folder rooted at `skills/<name>/SKILL.md`. The
+`.agents/skills/` path is a symlink onto `skills/`, so cross-skill
+links like `../nre/SKILL.md` keep resolving regardless of which
+prefix an agent indexes against. Upstream versions (NRE container
+tag, Asset Harvester commit, DiffusionHarmonizer release branches)
+are recorded in each skill's frontmatter `metadata:` block — bump
+those when upstream releases shift.
 
 ## Using these skills
 
@@ -96,12 +104,12 @@ skills directory. For Cursor:
 
 ```bash
 mkdir -p ~/.cursor/skills
-ln -s "$(pwd)/.agents/skills/nre"               ~/.cursor/skills/nre
-ln -s "$(pwd)/.agents/skills/ncore"             ~/.cursor/skills/ncore
-ln -s "$(pwd)/.agents/skills/asset-harvester"   ~/.cursor/skills/asset-harvester
-ln -s "$(pwd)/.agents/skills/nurec-fixer"       ~/.cursor/skills/nurec-fixer
+ln -s "$(pwd)/.agents/skills/nurec-index"          ~/.cursor/skills/nurec-index
 ln -s "$(pwd)/.agents/skills/physical-ai-datasets" ~/.cursor/skills/physical-ai-datasets
-ln -s "$(pwd)/.agents/skills/SKILL.md"          ~/.cursor/skills/nurec-index
+ln -s "$(pwd)/.agents/skills/ncore"                ~/.cursor/skills/ncore
+ln -s "$(pwd)/.agents/skills/nre"                  ~/.cursor/skills/nre
+ln -s "$(pwd)/.agents/skills/asset-harvester"      ~/.cursor/skills/asset-harvester
+ln -s "$(pwd)/.agents/skills/nurec-fixer"          ~/.cursor/skills/nurec-fixer
 ```
 
 Adjust the destination directory (`~/.claude/skills`, etc.) for other
@@ -164,8 +172,9 @@ Each skill is thin; the canonical artifacts live upstream:
   `PhysicalAI-`); curated collection
   <https://huggingface.co/collections/nvidia/physical-ai>
 
-When upstream releases shift, bump the pinned `_versions/<branch>/<commit>/`
-folder and update the symlinks at the skill root.
+When upstream releases shift, refresh the affected files in the
+skill's `references/` and `scripts/` folders and bump the
+`metadata:` block (and `version:`) in its `SKILL.md` frontmatter.
 
 ## Contributing
 
@@ -176,11 +185,11 @@ requests from external contributors will not be accepted.
   schema (`name`, `description`, `version`, `license`, `metadata`).
   Trigger keywords belong inside `description:` so the runtime indexes
   them.
-- New skills go under `.agents/skills/<folder>/`. Use the
-  `_versions/<branch>/<commit>/` layout when the skill wraps a
-  specific upstream commit; otherwise keep the SKILL flat (like
-  `physical-ai-datasets`).
-- After adding or renaming a skill, update the [`nurec-index`](./.agents/skills/SKILL.md)
+- New skills go under `.agents/skills/<folder>/` as a flat layout —
+  `SKILL.md` at the root, with optional `references/`, `scripts/`,
+  and `tests.yaml` siblings. Pin the upstream version inside the
+  skill's frontmatter `metadata:` block, not in the folder path.
+- After adding or renaming a skill, update the [`nurec-index`](./.agents/skills/nurec-index/SKILL.md)
   router so it knows how to route to it.
 
 ## License
