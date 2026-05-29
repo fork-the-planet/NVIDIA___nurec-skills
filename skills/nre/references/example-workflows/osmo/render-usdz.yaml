@@ -25,7 +25,11 @@ default-values:
   camera_to_render: "camera_front_wide_120fov"
   # nre/nre:latest is deprecated; nre-ga is the public NGC home of the GA build.
   nre_image: "nvcr.io/nvidia/nre/nre-ga:latest"
-  nre_entrypoint: /app/internal/scripts/pycena/runtime/pycena_run
+  # Unobfuscated public entrypoint of the GA OCI image (//:run → /app/run,
+  # workdir /app/run.runfiles/_main). The legacy
+  # /app/internal/scripts/pycena/runtime/pycena_run path points at the fully
+  # obfuscated build and is not present in the public nre image.
+  nre_entrypoint: /app/run
   shm_size: 64g
   render_height: "1024"
   video_framerate: "24"

@@ -37,8 +37,15 @@ default-values:
   # NRE / NuRec — nre/nre is deprecated; nre-ga is the GA build's public NGC home.
   nre_image: "nvcr.io/nvidia/nre/nre-ga:latest"
   nre_tools_image: "nvcr.io/nvidia/nre/nre-tools:latest"
-  nre_entrypoint: /app/internal/scripts/pycena/runtime/pycena_run
-  nre_config_dir: /app/internal/scripts/pycena/runtime/pycena_run.runfiles/_main/configs
+  # Unobfuscated public entrypoints exposed by the GA OCI images:
+  #   //:run         → /app/run         (workdir /app/run.runfiles/_main)
+  #   //apps:nre_tools → /app/apps/nre_tools
+  # The legacy /app/internal/scripts/pycena/runtime/pycena_run[*] paths point at
+  # the fully obfuscated builds and are not present in the public nre / nre-tools
+  # images.
+  nre_entrypoint: /app/run
+  nre_tools_entrypoint: /app/apps/nre_tools
+  nre_config_dir: /app/run.runfiles/_main/configs
   export_usdz_type: both
   run_id: latest
   # PyTorch multiprocessing uses /dev/shm; tiny default shm causes ENOSPC / bus errors.
@@ -249,10 +256,11 @@ workflow:
       mkdir -p "$NCORE_DIR"
       ln -sf {{input:0}}/$NCORE_NAME/* "$NCORE_DIR/"
 
-      # The nre-tools image entrypoint is a click group whose default subcommand
-      # is `ncore-aux-data`; pass the subcommand explicitly so we don't rely on
-      # the default-group fallback (matches nurec-workflows' nurec-steps.yaml).
-      /app/internal/scripts/pycena/runtime/pycena_nre_tools \
+      # The unobfuscated nre-tools image entrypoint (/app/apps/nre_tools) is a
+      # click group whose default subcommand is `ncore-aux-data`; pass the
+      # subcommand explicitly so we don't rely on the click default-group
+      # fallback (matches nurec-workflows' nurec-steps.yaml).
+      {{nre_tools_entrypoint}} \
         ncore-aux-data \
         --dataset-path="$NCORE_DIR/$NCORE_NAME.json" \
         --output-dir={{output}} \
