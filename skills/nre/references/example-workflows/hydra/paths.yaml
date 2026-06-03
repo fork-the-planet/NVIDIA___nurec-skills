@@ -1,5 +1,5 @@
 home: ${env:HOME} # how is the home directory on your system called
-repo_dir: "{home}/dev/nurec-workflows"
+repo_dir: "${env:REPO_ROOT,${home}/dev/nurec-workflows}" # run.sh sets REPO_ROOT; fallback applies to direct main.py runs
 local_dir: "{repo_dir}/local"
 bin_dir: "{local_dir}/bin"
 config_dir: "{repo_dir}/configs"

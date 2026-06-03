@@ -14,10 +14,10 @@ defaults:
   # retained because `car2sim` relies on it. Every layer `car2sim_6cam` defines
   # (background, road, dynamic_deformables, dynamic_rigids) must be listed,
   # otherwise the unlisted layers keep semantics-only signals.
-  # - /model/gaussians/extra_signal@model.layers.background.extra_signal: [semantic_logits, intensity]
-  # - /model/gaussians/extra_signal@model.layers.road.extra_signal: [semantic_logits, intensity]
-  # - /model/gaussians/extra_signal@model.layers.dynamic_deformables.extra_signal: [semantic_logits, intensity]
-  # - /model/gaussians/extra_signal@model.layers.dynamic_rigids.extra_signal: [semantic_logits, intensity]
+  - /model/gaussians/extra_signal@model.layers.background.extra_signal: [semantic_logits, intensity]
+  - /model/gaussians/extra_signal@model.layers.road.extra_signal: [semantic_logits, intensity]
+  - /model/gaussians/extra_signal@model.layers.dynamic_deformables.extra_signal: [semantic_logits, intensity]
+  - /model/gaussians/extra_signal@model.layers.dynamic_rigids.extra_signal: [semantic_logits, intensity]
   - _self_
 
 dataset:
