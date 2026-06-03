@@ -5,7 +5,12 @@ Most-used `docker run` invocations. The single-line summary lives in
 inventory, the per-sub-command `--help` examples, and the authoritative
 flag tables.
 
-## Train + validate (Waymo-style dynamic 3DGUT)
+## Train + validate (Waymo Open Dataset, dynamic 3DGUT)
+
+> **Recipe scope.** `configs/apps/AV/Waymo/3dgut_dynamic.yaml` is for
+> the **Waymo Open Dataset** only — it bakes in the Waymo sensor rig.
+> For the NVIDIA Physical AI Autonomous Vehicles (PAI) dataset, use
+> the Hyperion-8.1 recipe in the next section instead.
 
 ```bash
 docker run --shm-size=64g -it --rm --gpus all \
@@ -23,6 +28,49 @@ docker run --shm-size=64g -it --rm --gpus all \
   checkpoint.artifact.rig_trajectories.enabled=true \
   checkpoint.artifact.sequence_tracks.enabled=true
 ```
+
+## Train + validate (Physical AI Autonomous Vehicles — Hyperion-8.1)
+
+For the gated NVIDIA dataset
+[`nvidia/PhysicalAI-Autonomous-Vehicles`](https://huggingface.co/datasets/nvidia/PhysicalAI-Autonomous-Vehicles),
+use `/apps/prod/Hyperion-8.1/car2sim_6cam.yaml` via the small overlay
+shipped at [`configs/pai.yaml`](configs/pai.yaml) — **not** the Waymo
+recipe above.
+
+The overlay extends `car2sim_6cam.yaml` with the PAI six-camera
+validation set, `lidar_top_360fov`, and lidar-`intensity`
+supervision. Mount it into the container's config tree as
+`external_overrides.yaml`, then drive training with
+`--config-name=external_overrides`.
+
+```bash
+# Resolve the in-container config dir (e.g. /app/run.runfiles/_main/configs).
+NRE_CONFIG_DIR=/app/run.runfiles/_main/configs
+
+docker run --shm-size=64g -it --rm --gpus all \
+  -u "$(id -u):$(id -g)" \
+  -e NGC_API_KEY=${NGC_API_KEY} \
+  --volume /path/to/dataset:/workdir/dataset \
+  --volume /path/to/output:/workdir/output \
+  --volume $(pwd)/configs/pai.yaml:${NRE_CONFIG_DIR}/external_overrides.yaml:ro \
+  nvcr.io/nvidia/nre/nre:latest \
+  --config-name=external_overrides \
+  mode=trainval \
+  dataset.path=/workdir/dataset/<NAME>.json \
+  'dataset.camera_ids=[camera_front_wide_120fov,camera_front_tele_30fov,camera_cross_left_120fov,camera_cross_right_120fov,camera_rear_left_70fov,camera_rear_right_70fov]' \
+  'dataset.lidar_ids=[lidar_top_360fov]' \
+  out_dir=/workdir/output \
+  logger=tensorboard \
+  checkpoint.artifact.enabled=true \
+  checkpoint.artifact.rig_trajectories.enabled=true \
+  checkpoint.artifact.sequence_tracks.enabled=true
+```
+
+For the OSMO equivalent (which writes the overlay inline as the
+`prepare-nre-config` task), see
+[`example-workflows/osmo/pai-nurec.yaml`](example-workflows/osmo/pai-nurec.yaml);
+for the full host-side PAI walkthrough see
+[`example-workflows/bash/nurec_workflow_pai.md`](example-workflows/bash/nurec_workflow_pai.md).
 
 ## Re-validate with a 3 m lateral shift
 

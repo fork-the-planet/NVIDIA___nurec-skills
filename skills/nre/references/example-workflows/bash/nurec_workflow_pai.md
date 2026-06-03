@@ -620,23 +620,41 @@ docker pull nvcr.io/nvidia/nre/nre-ga:latest
 
 </details>
 
+For PAI clips, train with the **Hyperion-8.1 `car2sim_6cam`**
+recipe — **not** the Waymo recipe. The Waymo configs under
+`configs/apps/AV/Waymo/3dgut_dynamic.yaml` (and siblings) bake in the
+Waymo Open Dataset sensor rig and validation set, and should only be
+used for that dataset.
+
+For PAI we drive training off a small overlay that uses
+`/apps/prod/Hyperion-8.1/car2sim_6cam.yaml` as its `defaults` base
+and adds the PAI sensor IDs and lidar `intensity` supervision. The
+ready-made overlay ships at
+[`references/configs/pai.yaml`](../../configs/pai.yaml). Mount it
+into the container as `<nre_config_dir>/external_overrides.yaml`,
+then pass `--config-name=external_overrides`.
+
 To begin training the reconstruction model in the Docker container, edit the following command to reflect the correct variables and then run it:
 
 <details><summary>▸ View command</summary>
 
 ```bash
+# In-container path of NRE's Hydra config dir; matches the GA image entrypoint.
+NRE_CONFIG_DIR=/app/run.runfiles/_main/configs
+
 docker run --shm-size=64g -it --rm --gpus all \
   -u "$(id -u):$(id -g)" \
   -e NGC_API_KEY=${NGC_API_KEY} \
   --volume <path to your NCore shard, and auxiliary data directory>:/workdir/dataset \
   --volume <path to your output folder to save your 3D reconstructed Scenes>:/workdir/output \
+  --volume <path to references/configs/pai.yaml>:${NRE_CONFIG_DIR}/external_overrides.yaml:ro \
   nvcr.io/nvidia/nre/nre-ga:latest \
-  --config-name=configs/apps/AV/Waymo/3dgut_dynamic.yaml \
+  --config-name=external_overrides \
   mode=trainval \
   out_dir=/workdir/output \
   dataset.path=/workdir/dataset/pai_<clip_id>.json \
-  dataset.lidar_ids="[lidar_top_360fov]" \
-  dataset.camera_ids="[camera_front_wide_120fov,camera_cross_left_120fov,camera_cross_right_120fov,camera_rear_left_70fov,camera_rear_right_70fov]" \
+  'dataset.camera_ids=[camera_front_wide_120fov,camera_front_tele_30fov,camera_cross_left_120fov,camera_cross_right_120fov,camera_rear_left_70fov,camera_rear_right_70fov]' \
+  'dataset.lidar_ids=[lidar_top_360fov]' \
   logger=tensorboard \
   logger.run_id="latest" \
   checkpoint.artifact.enabled=true \
@@ -649,11 +667,13 @@ docker run --shm-size=64g -it --rm --gpus all \
 
 Notes:
 
-- The NRE 26.04 public container ships AV recipes under `configs/apps/AV/{Waymo,NV,PandaSet,Tesla}/*.yaml`. `3dgut_dynamic.yaml` is the canonical dynamic-scene recipe. Override `dataset.camera_ids` / `dataset.lidar_ids` to match the PAI sensors you exported in step 2.
+- The NRE 26.04 public container ships AV recipes under `configs/apps/AV/{Waymo,NV,PandaSet,Tesla}/*.yaml` plus the Hyperion family under `apps/prod/Hyperion-8.1/*.yaml`. **For PAI, use `/apps/prod/Hyperion-8.1/car2sim_6cam.yaml`** (via the `references/configs/pai.yaml` overlay above) — the Waymo `3dgut_dynamic.yaml` is for the Waymo Open Dataset only.
+- The `references/configs/pai.yaml` overlay already enumerates the six PAI cameras and the `lidar_top_360fov` lidar in its `dataset:` block; the explicit `dataset.camera_ids` / `dataset.lidar_ids` overrides above are belt-and-suspenders guards that also let you trim the list (e.g. drop the rear cameras) without editing the overlay.
 - Run `docker run --rm nvcr.io/nvidia/nre/nre-ga:latest --help` to enumerate the recipes shipped in your specific build.
 - Setting `checkpoint.artifact.enabled=true` (with the `rig_trajectories` / `sequence_tracks` sub-keys) is required so `serve-grpc` / `render-grpc` can consume the resulting USDZ in the next step.
 - Not passing `dataset.camera_ids` makes NRE consume every camera in the NCore JSON, which also requires aux data for every camera; restrict the list to the cameras you ran the aux step on.
 - Update the `--volume <path to your NCore shard, and auxiliary data directory>:/workdir/dataset` flag to point at the folder containing the `.zarr.itar`, `<clip_id>.aux.*.zarr.itar`, and `<clip_id>.json` files.
+- If `/app/run.runfiles/_main/configs` ever moves in a future GA image, find the new path with `docker run --rm --entrypoint sh nvcr.io/nvidia/nre/nre-ga:latest -c 'ls /app/run.runfiles/_main/configs'` and adjust `NRE_CONFIG_DIR`.
 - The `-u "$(id -u):$(id -g)"` flag keeps all outputs (USDZ, MP4s, metrics) owned by the host user — without it everything lands as `root`.
 
 For more information regarding Neural Reconstruction and its options please visit the [NuRec public docs](https://docs.nvidia.com/omniverse/nurec/).

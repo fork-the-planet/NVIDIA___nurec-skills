@@ -9,7 +9,7 @@ description: >-
   export PLY/depth/mesh/USDZ, edit actors, and evaluate metrics. Do
   NOT use for per-object asset capture (use `asset-harvester`) or
   sensor-to-NCore conversion (use `ncore`).
-version: "0.2.1"
+version: "0.2.2"
 tools:
   - Shell
   - Read
@@ -120,7 +120,27 @@ evaluate metrics. Concrete triggers:
 - **camera_ids / lidar_ids** — sensor IDs from the NCore JSON to
   include. Default: all sensors per recipe.
 - **config_name** — Hydra config path resolved inside the
-  container, e.g. `configs/apps/AV/Waymo/3dgut_dynamic.yaml`.
+  container. Pick by source dataset:
+  - **Waymo Open Dataset** →
+    `configs/apps/AV/Waymo/3dgut_dynamic.yaml` (and its
+    `_mcmc` / `_road_semantic` / `_static` siblings). These are
+    Waymo-only — they bake in the Waymo sensor rig and conventions.
+  - **NVIDIA Physical AI Autonomous Vehicles (PAI)** →
+    `/apps/prod/Hyperion-8.1/car2sim_6cam.yaml` (the Hyperion-8.1
+    car2sim 6-camera recipe used by the Maglev PAI pipeline).
+    Typically referenced via the small overlay shipped at
+    [`references/configs/pai.yaml`](references/configs/pai.yaml),
+    which extends `car2sim_6cam.yaml` with PAI's
+    `lidar_top_360fov` ID, six-camera validation set, and lidar
+    `intensity` supervision; mount it as
+    `{nre_config_dir}/external_overrides.yaml` and pass
+    `--config-name=external_overrides`.
+  - **PandaSet / NVIDIA AV (NV) / Tesla / Alpasim** → see the
+    matching `configs/apps/AV/{PandaSet,NV,Tesla}/…` or
+    `configs/apps/Alpasim/…` recipes in
+    `references/configuration.md`.
+  - Do **not** use the Waymo recipes for PAI clips — the
+    sensor rig, validation cameras, and lidar IDs differ.
 - **mode** — `train`, `val`, or `trainval`. Default: `trainval`.
 - **NGC_API_KEY** — required env var. Generate at
   <https://org.ngc.nvidia.com/setup/api-keys>.
