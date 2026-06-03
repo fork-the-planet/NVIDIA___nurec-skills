@@ -53,6 +53,6 @@ dataset:
 # Supervise predicted lidar intensity (the AV loss recipe disables it with
 # lambda_ 0.0). Without supervision the intensity extra signal is emitted but
 # never learned, so the predicted point cloud's intensity would be meaningless.
-loss:
-  intensity:
-    lambda_: 1.0
+# loss:
+#   intensity:
+#     lambda_: 1.0
