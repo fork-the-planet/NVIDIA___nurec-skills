@@ -85,7 +85,7 @@ docker run --shm-size=64g -it --rm --gpus all \
 
 | Override | Default | Purpose |
 |----------|---------|---------|
-| `--config-name` | (required) | Hydra config to load. Use a recipe shipped in the container (e.g. `configs/apps/AV/Waymo/3dgut_dynamic.yaml`) at training time; for validation / export re-pass `/workdir/output/<RUN-ID>/config/parsed.yaml`. |
+| `--config-name` | (required) | Hydra config to load. Use a recipe shipped in the container at training time, then re-pass `/workdir/output/<RUN-ID>/config/parsed.yaml` for validation / export. Pick by source dataset: **Waymo Open Dataset** → `configs/apps/AV/Waymo/3dgut_dynamic.yaml` (Waymo-only; do not use for PAI); **NVIDIA Physical AI Autonomous Vehicles (PAI)** → `/apps/prod/Hyperion-8.1/car2sim_6cam.yaml` via the [`references/configs/pai.yaml`](configs/pai.yaml) overlay (mount as `external_overrides.yaml`, pass `--config-name=external_overrides`); PandaSet / NV / Tesla / Alpasim → matching `configs/apps/...` paths. Full table in [`configuration.md`](configuration.md). |
 | `mode` | `trainval` | `train`, `val`, or `trainval`. |
 | `dataset.path` | (required at train) | NCore JSON manifest inside the container (`/workdir/dataset/<NAME>.json`). |
 | `out_dir` | `???` (must be set) | Output root inside the container; bind-mount it. |
@@ -960,11 +960,24 @@ The container downloads any missing model checkpoints from NGC into
 ## 3. Hydra recipe paths shipped in the container
 
 You don't need the source tree to enumerate config recipes — the
-container resolves them itself. The most-used recipes for AV
-reconstruction:
+container resolves them itself. Pick by source dataset:
+
+- **Waymo Open Dataset** → `configs/apps/AV/Waymo/*.yaml` (Waymo-only).
+- **NVIDIA Physical AI Autonomous Vehicles (PAI)** →
+  `/apps/prod/Hyperion-8.1/car2sim_6cam.yaml`, normally consumed via
+  the [`references/configs/pai.yaml`](configs/pai.yaml) overlay
+  (`--config-name=external_overrides` after mounting that file as
+  `<nre_config_dir>/external_overrides.yaml`).
+- **PandaSet / NV / Tesla / Alpasim** → matching paths below.
+
+Do **not** use the Waymo recipes for PAI clips — the sensor rig,
+validation cameras, and lidar IDs differ.
+
+The most-used recipes for AV reconstruction:
 
 ```text
-configs/apps/AV/Waymo/3dgut_dynamic.yaml                 # canonical AV / Waymo dynamic 3DGUT
+# Waymo Open Dataset (Waymo-only)
+configs/apps/AV/Waymo/3dgut_dynamic.yaml                 # canonical Waymo Open Dataset dynamic 3DGUT
 configs/apps/AV/Waymo/3dgut_dynamic_mcmc.yaml            # MCMC densification (default since 25.07)
 configs/apps/AV/Waymo/3dgut_dynamic_mcmc_gsplat.yaml     # gsplat renderer + MCMC
 configs/apps/AV/Waymo/3dgut_dynamic_road_semantic.yaml   # adds the road semantic loss
@@ -973,6 +986,9 @@ configs/apps/AV/Waymo/3dgut_static.yaml                  # static-scene baseline
 configs/apps/AV/Waymo/3dgut_static_mcmc.yaml
 configs/apps/AV/Waymo/3dgut_static_calib.yaml            # static + camera calibration optim
 configs/apps/AV/Waymo/3dgut_static_road_semantic.yaml
+
+# Physical AI Autonomous Vehicles (PAI) — Hyperion-8.1
+/apps/prod/Hyperion-8.1/car2sim_6cam.yaml                # PAI reconstruction recipe (use via references/configs/pai.yaml)
 
 configs/apps/AV/PandaSet/3dgut_dynamic.yaml
 configs/apps/AV/PandaSet/3dgut_dynamic_mcmc.yaml

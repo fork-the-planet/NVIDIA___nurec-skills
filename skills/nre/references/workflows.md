@@ -30,6 +30,16 @@ to `serve-grpc` + a Python client. Full code for coordinate-frame
 conversion (NuRec ↔ ECEF ↔ OpenDRIVE ENU) lives in
 `physical-ai-render.md`.
 
+If you instead need to **train from scratch** on the upstream
+`nvidia/PhysicalAI-Autonomous-Vehicles` clips (after running
+`pai-to-ncore`), use the Hyperion-8.1 `car2sim_6cam` recipe via the
+[`configs/pai.yaml`](configs/pai.yaml) overlay — see the "Train +
+validate (Physical AI Autonomous Vehicles — Hyperion-8.1)" recipe in
+[`cookbook.md`](cookbook.md) and the host-side walkthrough in
+[`example-workflows/bash/nurec_workflow_pai.md`](example-workflows/bash/nurec_workflow_pai.md).
+Do **not** train PAI clips with the Waymo `3dgut_dynamic.yaml` recipe;
+that one is for the Waymo Open Dataset only.
+
 ## Workflow C — Insert Asset-Harvester actors into a USDZ
 
 1. Run `asset-harvester` on the relevant `track_ids` from the
@@ -43,6 +53,12 @@ conversion (NuRec ↔ ECEF ↔ OpenDRIVE ENU) lives in
    --edit-assets <path>` to produce edited frames.
 
 ## Workflow D — Multi-GPU training
+
+The example below is for the Waymo Open Dataset. Swap
+`--config-name` for the recipe matching your source dataset (PAI →
+`external_overrides` overlay; PandaSet / NV / Tesla → corresponding
+`configs/apps/...` path) — the multi-GPU flags are independent of
+the recipe.
 
 ```bash
 # Explicit: 4 GPUs on 1 node.

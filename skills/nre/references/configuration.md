@@ -21,11 +21,27 @@ The container resolves recipes itself; the path you pass to
 `--config-name` is interpreted relative to the in-container
 `configs/` tree.
 
-### AV — Waymo
+### Picking the right recipe by source dataset
+
+| Source dataset | Use this recipe family |
+|----------------|------------------------|
+| **Waymo Open Dataset** | `configs/apps/AV/Waymo/*.yaml` (see below). **Waymo-only** — bakes in the Waymo sensor rig. |
+| **NVIDIA Physical AI Autonomous Vehicles (PAI)** | `/apps/prod/Hyperion-8.1/car2sim_6cam.yaml`, typically referenced via the [`references/configs/pai.yaml`](configs/pai.yaml) overlay. **Do not use the Waymo recipes for PAI.** |
+| **NVIDIA Hyperion / NV-AV captures (non-PAI)** | `configs/apps/AV/NV/*.yaml`. |
+| **PandaSet** | `configs/apps/AV/PandaSet/*.yaml`. |
+| **Tesla research clips** | `configs/apps/AV/Tesla/*.yaml`. |
+| **Alpasim** | `configs/apps/Alpasim/*.yaml`. |
+
+### AV — Waymo (Waymo Open Dataset only)
+
+These recipes target the Waymo Open Dataset sensor rig and
+conventions. **Do not pick them for PAI clips, NV/Hyperion captures,
+PandaSet, or any non-Waymo source** — the sensor IDs, intrinsics, and
+validation cameras will be wrong.
 
 | Recipe | What it sets up |
 |--------|-----------------|
-| `configs/apps/AV/Waymo/3dgut_dynamic.yaml` | Canonical AV / Waymo dynamic 3DGUT recipe. |
+| `configs/apps/AV/Waymo/3dgut_dynamic.yaml` | Canonical Waymo Open Dataset dynamic 3DGUT recipe. |
 | `configs/apps/AV/Waymo/3dgut_dynamic_mcmc.yaml` | Same, with MCMC densification (default since 25.07). |
 | `configs/apps/AV/Waymo/3dgut_dynamic_mcmc_gsplat.yaml` | gsplat renderer + MCMC. |
 | `configs/apps/AV/Waymo/3dgut_dynamic_road_semantic.yaml` | Adds the road-semantic supervision. |
@@ -39,6 +55,37 @@ Default Waymo cameras: `camera_front_50fov`,
 `camera_front_right_50fov`, `camera_front_left_50fov`. Default LiDAR:
 `lidar_top`. (`camera_side_left_50fov` / `camera_side_right_50fov` are
 also available.)
+
+### AV — Physical AI Autonomous Vehicles (PAI) / Hyperion-8.1
+
+For the gated NVIDIA dataset
+[`nvidia/PhysicalAI-Autonomous-Vehicles`](https://huggingface.co/datasets/nvidia/PhysicalAI-Autonomous-Vehicles)
+(after running `pai-to-ncore` to land NCore V4 shards), train with the
+Hyperion-8.1 `car2sim_6cam` recipe, **not** any Waymo recipe.
+
+| Recipe | What it sets up |
+|--------|-----------------|
+| `/apps/prod/Hyperion-8.1/car2sim_6cam.yaml` | Hyperion-8.1 6-camera car2sim recipe. Matches the Maglev PAI reconstruction settings (front wide / front tele / cross left / cross right / rear left / rear right cameras, plus `lidar_top_360fov`). |
+
+The skill ships a thin overlay at
+[`references/configs/pai.yaml`](configs/pai.yaml) that uses
+`/apps/prod/Hyperion-8.1/car2sim_6cam.yaml` as its `defaults` base
+and adds the PAI-specific deltas (six-camera validation set, lidar
+ID, lidar-`intensity` extra signal + supervision). Standard usage:
+
+1. Mount `references/configs/pai.yaml` into the container as
+   `<nre_config_dir>/external_overrides.yaml` (the in-container
+   config tree resolves it from there).
+2. Pass `--config-name=external_overrides` to the NRE entrypoint.
+3. Add Hydra overrides for `dataset.path`, `dataset.camera_ids`,
+   `dataset.lidar_ids`, and `out_dir` as usual.
+
+The OSMO template at
+[`example-workflows/osmo/pai-nurec.yaml`](example-workflows/osmo/pai-nurec.yaml)
+shows this pattern end-to-end (see the `prepare-nre-config` and
+`training` tasks). The bash recipe in
+[`example-workflows/bash/nurec_workflow_pai.md`](example-workflows/bash/nurec_workflow_pai.md)
+covers the host-side equivalent.
 
 ### AV — NV (NVIDIA Hyperion / NV-AV stack)
 
