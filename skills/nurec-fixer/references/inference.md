@@ -1,127 +1,134 @@
-# DiffusionHarmonizer — Model download and inference
+# DiffusionHarmonizer — Checkpoint download and inference
 
 Detail moved out of `SKILL.md`.
 
 ## Container setup
 
-Build instructions (and the raw-Cosmos fallback) are in
+Build instructions (and the raw-base fallback) are in
 [`wrapper-image.md`](wrapper-image.md). Stop there first; the rest of
-this file assumes the `harmonizer-cosmos-env` image (or an equivalent
-raw Cosmos Predict2 container) is already available.
+this file assumes the `harmonizer-cosmos-env` image (built from the
+project `Dockerfile.cosmos`, base `nvcr.io/nvidia/pytorch:25.10-py3`)
+is already available.
 
-If you are running directly inside the raw Cosmos Predict2 base
-container (no project image) on Blackwell (B200, GB200), apply the
-Text2ImageDIT patch shipped in the checkout before inference, and the
-tokenizer patch as well for training:
+The project `Dockerfile.cosmos` installs `cosmos-predict2` and bakes
+in both the tokenizer and Text2ImageDIT patches during build. You only
+need to apply the patches by hand if you run inference directly inside
+the raw base container instead of the project image:
 
 ```bash
-patch /usr/local/lib/python3.12/dist-packages/cosmos_predict2/models/text2image_dit.py text2image_dit.patch
 patch /usr/local/lib/python3.12/dist-packages/cosmos_predict2/tokenizers/tokenizer.py tokenizer.patch
+patch /usr/local/lib/python3.12/dist-packages/cosmos_predict2/models/text2image_dit.py text2image_dit.patch
 ```
 
-The project Dockerfile bakes both patches in; apply them by hand only
-in raw-container mode.
+## Checkpoint download
 
-## Model download
-
-Install and authenticate the Hugging Face CLI, then download the
-model:
+Install and authenticate the Hugging Face CLI, then run the repo's
+download helper from the checkout root. It fetches the Harmonizer
+checkpoints **and** the base Cosmos-Predict2 model that inference
+requires, placing each in the directory the code expects:
 
 ```bash
 python3 -m pip install --user "huggingface_hub[cli]"
 export HF_TOKEN=<your-hugging-face-token>
 hf auth login --token "$HF_TOKEN"
-hf download nvidia/DiffusionHarmonizer --local-dir models
+./download_checkpoints.sh
 ```
+
+This downloads:
+
+- `nvidia/Harmonizer` into `models/` — including the paper checkpoint
+  `models/diffusion_harmonizer.pkl` and `models/harmonizer_nontemporal.pt`.
+- `nvidia/Cosmos-Predict2-0.6B-Text2Image` (DiT `model.pt` + tokenizer)
+  into `src/checkpoints/nvidia/Cosmos-Predict2-0.6B-Text2Image/`.
+
+Add `--with-dataset` to also pull the training dataset into `data/`.
 
 Expected checkpoint:
 
 ```bash
-ls -lh models/pretrained/pretrained_harmonizer.pkl
+ls -lh models/diffusion_harmonizer.pkl
+ls -d src/checkpoints/nvidia/Cosmos-Predict2-0.6B-Text2Image
 ```
 
-Never commit `models/`, the downloaded checkpoint, or `HF_TOKEN`.
+Never commit `models/`, `src/checkpoints/`, the downloaded checkpoints,
+or `HF_TOKEN`.
 
-## Run inference (`src/inference_pretrained_model.py`)
+## Run inference (`src/inference_pix2pix_turbo_harmonizer.py`)
+
+The inference script lives in `src/` and imports sibling modules, so it
+must be launched from inside `/work/src`. It also loads the base Cosmos
+model from `src/checkpoints/`, so mount the whole checkout at `/work`
+(do not mount only the frames). Output frames are written to a sibling
+folder named `<input_dir>_<model_identifier>` next to the input — there
+is no `--output` flag.
 
 ```bash
 IMAGE=harmonizer-cosmos-env
 CODE_DIR=/absolute/path/to/harmonizer
-MODEL_PATH=/work/models/pretrained/pretrained_harmonizer.pkl
-INPUT_DIR=/absolute/path/to/rendered_frames
-OUTPUT_DIR=/absolute/path/to/enhanced_frames
-
-mkdir -p "$OUTPUT_DIR"
 
 docker run --gpus=all --rm --ipc=host \
   -u "$(id -u):$(id -g)" \
   -v "$CODE_DIR":/work \
-  -v "$INPUT_DIR":/input:ro \
-  -v "$OUTPUT_DIR":/output \
-  -w /work \
+  -w /work/src \
   "$IMAGE" \
-  python /work/src/inference_pretrained_model.py \
-    --model "$MODEL_PATH" \
-    --input /input \
-    --output /output \
+  python inference_pix2pix_turbo_harmonizer.py \
+    --input_image /work/examples \
+    --model_path /work/models/diffusion_harmonizer.pkl \
+    --model_identifier "harmonizer_inference" \
     --timestep 250 \
-    --resolution 1024
+    --resolution 1024 \
+    --use_sched
 ```
 
-Useful flags exposed by the public inference script:
+To enhance frames that live outside the checkout, mount them under
+`/work` (for example `-v "$INPUT_DIR":/work/input`) and point
+`--input_image /work/input`; the enhanced frames then appear in
+`/work/input_<model_identifier>` on the host.
+
+The README's interactive equivalent is:
+
+```bash
+docker run --gpus=all -it --ipc=host -v "$(pwd)":/work harmonizer-cosmos-env
+# then, inside the container:
+cd /work/src
+python inference_pix2pix_turbo_harmonizer.py \
+    --input_image /work/examples \
+    --model_path /work/models/diffusion_harmonizer.pkl \
+    --model_identifier "harmonizer_inference" \
+    --timestep 250 --resolution 1024 --use_sched
+```
+
+Flags exposed by `inference_pix2pix_turbo_harmonizer.py`:
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--model` | required | Path to `pretrained_harmonizer.pkl`. |
-| `--input` | required | Directory of input frames. |
-| `--output` | `output` | Directory for enhanced frames. |
-| `--timestep` | script default (README uses `250`) | Diffusion timestep used by the distilled model. |
-| `--resolution` | `1024` | Internal size key. `1024` maps to `1024x576`. Other supported keys: `960`, `1360`, `704`, `512`, `256`, `1920`. |
-| `--batch_size` | `8` for benchmarking | Batch size for speed testing. Image generation path currently processes frames one at a time. |
+| `--input_image` | required | Directory of input frames (`.png`, `.jpg`, `.jpeg`). |
+| `--model_path` | required | Path to `diffusion_harmonizer.pkl`. |
+| `--model_identifier` | `fixer` | Suffix for the output folder `<input_dir>_<model_identifier>`. README uses `harmonizer_inference`. |
+| `--timestep` | `250` | Diffusion timestep used by the distilled model. |
+| `--resolution` | `1024` | Internal size key. `1024` -> `1024x576`. Supported keys: `1024`, `960`, `1360`. |
+| `--use_sched` | off | Enable the scheduler used in the README command. |
+| `--vae_skip_connection` | off | Enable the VAE skip connection. |
+| `--save_video` | off | Also write an MP4 assembled from the output folder. |
 | `--max_frames` | very large | Maximum number of frames to process. |
+| `--start_frame` | `0` | Index of the first frame to process. |
 | `--skip_frames` | `1` | Process every Nth frame. |
-| `--save_video` | off | Save an MP4 from the output folder. |
-| `--test-speed` | off | Run the built-in speed benchmark. |
+| `--offset_list` | `-1 -2 -3 -4` | Negative offsets into previously-predicted outputs used as temporal references. |
+| `--nontemporal` | off | Disable temporal conditioning; run frame-by-frame. |
 
-The branch model card reports H100 testing and an inference time
-of about `212 ms` on one H100. The code also has a local
-speed-test mode; trust the measurement from your target hardware
-for capacity planning.
+The model card reports H100 testing with an inference time of about
+`212 ms` per frame on one H100. Trust the measurement from your target
+hardware for capacity planning.
 
-## Temporal variant
+## Temporal vs. non-temporal
 
-The newer branches also include
-`src/inference_pix2pix_turbo_harmonizer.py`, which runs a
-temporal/autoregressive variant using prior enhanced frames as
-references. Use it when the user explicitly asks for temporal
-conditioning rather than the standard pretrained model script.
+`inference_pix2pix_turbo_harmonizer.py` is temporal by default: once
+enough history exists it uses the four previous enhanced frames
+(`--offset_list -1 -2 -3 -4`) as references, and early frames fall back
+to a non-temporal pass. Because each output is fed back in as a future
+reference, keep each run's output folder separate so stale temporal
+outputs cannot be reused accidentally.
 
-Key differences:
-
-- Accepts `--input_image`, `--model_path`, `--model_identifier`,
-  `--offset_list`, and `--nontemporal`.
-- Writes to a sibling output folder named
-  `<input_dir>_<model_identifier>` instead of taking `--output`.
-- Default `--offset_list -1 -2 -3 -4` uses the four previous
-  enhanced frames as temporal references once enough history
-  exists.
-- Early frames fall back to a non-temporal pass.
-
-Example:
-
-```bash
-docker run --gpus=all --rm --ipc=host \
-  -u "$(id -u):$(id -g)" \
-  -v "$CODE_DIR":/work \
-  -v "$INPUT_DIR":/input:ro \
-  -w /work \
-  harmonizer-cosmos-env \
-  python /work/src/inference_pix2pix_turbo_harmonizer.py \
-    --model_path /work/models/pretrained/pretrained_harmonizer.pkl \
-    --input_image /input \
-    --model_identifier harmonized \
-    --timestep 250
-```
-
-If reproducibility matters, keep each run's output folder
-separate so old temporal outputs cannot be reused accidentally.
+For unordered images, or when you want each frame enhanced
+independently, add `--nontemporal` to disable temporal conditioning
+entirely.

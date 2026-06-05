@@ -189,7 +189,7 @@ def main() -> int:
             "hf-token",
             check_env_token(
                 "HF_TOKEN",
-                "required to download nvidia/DiffusionHarmonizer and optional dataset artifacts",
+                "required to download nvidia/Harmonizer, the base Cosmos model, and optional dataset artifacts",
                 args.strict,
             ),
         ),

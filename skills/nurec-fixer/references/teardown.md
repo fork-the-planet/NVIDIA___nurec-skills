@@ -1,17 +1,18 @@
 # Teardown — nurec-fixer / DiffusionHarmonizer
 
 A complete DiffusionHarmonizer workflow can leave **100 GB+** on disk,
-especially if you build the Cosmos image and download the optional
+especially if you build the runtime image and download the optional
 training dataset.
 
 | Artifact | Approximate size | Source |
 |----------|------------------|--------|
-| `nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2` or layered project image | tens of GB | `docker pull` / `docker build` |
+| `harmonizer-cosmos-env` image (base `nvcr.io/nvidia/pytorch:25.10-py3`) | tens of GB | `docker build` / `docker pull` |
 | Docker build cache | tens of GB | `docker build -f Dockerfile.cosmos` |
 | `harmonizer/` code checkout | repo-dependent | `git clone https://github.com/NVIDIA/harmonizer.git` |
-| `models/` with `pretrained_harmonizer.pkl` | model-dependent | `hf download nvidia/DiffusionHarmonizer` |
+| `models/` with `diffusion_harmonizer.pkl` | model-dependent | `./download_checkpoints.sh` (`nvidia/Harmonizer`) |
+| `src/checkpoints/nvidia/Cosmos-Predict2-0.6B-Text2Image/` | model-dependent | `./download_checkpoints.sh` (base Cosmos model) |
 | Hugging Face hub cache | model/dataset-dependent | `hf download` |
-| `data/` training dataset | large | `hf download nvidia/DiffusionHarmonizer-Dataset` |
+| `data/` training dataset | large | `./download_checkpoints.sh --with-dataset` (`nvidia/Harmonizer-Dataset`) |
 | Enhanced/evaluation outputs | sequence-dependent | inference/evaluation runs |
 
 ## Reclaim Disk
@@ -22,7 +23,7 @@ Run only the blocks that apply to your host.
 
 ```bash
 docker image rm harmonizer-cosmos-env 2>/dev/null || true
-docker image rm nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2 2>/dev/null || true
+docker image rm nvcr.io/nvidia/pytorch:25.10-py3 2>/dev/null || true
 docker image prune -f
 docker builder prune -f
 ```
@@ -30,9 +31,10 @@ docker builder prune -f
 ### 2. Code Checkout, Model, And Dataset Copies
 
 ```bash
-rm -rf /absolute/path/to/harmonizer
 rm -rf /absolute/path/to/harmonizer/models
+rm -rf /absolute/path/to/harmonizer/src/checkpoints
 rm -rf /absolute/path/to/harmonizer/data
+rm -rf /absolute/path/to/harmonizer
 ```
 
 If you downloaded model or dataset artifacts elsewhere, remove those
@@ -43,7 +45,7 @@ paths instead.
 For targeted cleanup, inspect the cache first:
 
 ```bash
-hf cache ls | grep -E 'DiffusionHarmonizer|harmonizer' || true
+hf cache ls | grep -E 'Harmonizer|Cosmos-Predict2' || true
 ```
 
 Then delete the specific cached repos with `hf cache delete`, or remove
@@ -72,7 +74,7 @@ rm -rf /absolute/path/to/enhanced_frames
 ## Verify
 
 ```bash
-docker images | grep -E 'harmonizer-cosmos-env|cosmos-predict2-container' || echo "images: clean"
+docker images | grep -E 'harmonizer-cosmos-env|nvcr.io/nvidia/pytorch' || echo "images: clean"
 du -sh /absolute/path/to/harmonizer 2>/dev/null || echo "checkout: clean"
 ```
 

@@ -26,21 +26,30 @@ and matching filenames. Images may be PNG, JPEG, or JPG.
 
 ## Run evaluation
 
+`evaluate_test_dataset.py` loads the base Cosmos model from
+`src/checkpoints/`, so mount the whole checkout at `/work` and run from
+`/work/src`. Place the test dataset under `/work` as well (or mount it
+read-write so the script can write `evaluation/` and `metrics.yaml`):
+
 ```bash
 docker run --gpus=all --rm --ipc=host \
   -u "$(id -u):$(id -g)" \
   -v "$CODE_DIR":/work \
-  -v /absolute/path/to/test_dataset:/test_dataset \
-  -w /work \
+  -v /absolute/path/to/test_dataset:/work/test_dataset \
+  -w /work/src \
   harmonizer-cosmos-env \
-  python /work/src/evaluate_test_dataset.py \
-    --model /work/models/pretrained/pretrained_harmonizer.pkl \
-    --input /test_dataset
+  python evaluate_test_dataset.py \
+    --model /work/models/diffusion_harmonizer.pkl \
+    --input /work/test_dataset \
+    --output /work/test_dataset/evaluation
 ```
+
+Add `--calculate-for-input` to also report metrics between the raw
+input renders and ground truth (in addition to enhanced output vs. GT).
 
 ## Expected outputs
 
-- Enhanced images under an `evaluation/` directory that mirrors
-  the test dataset structure.
-- `metrics.yaml` with overall and per-scene PSNR/LPIPS, inference
-  time, image counts, and GPU memory statistics.
+- Enhanced images under the `--output` directory (default
+  `evaluation/`) that mirrors the test dataset structure.
+- `metrics.yaml` in the output directory with overall and per-scene
+  PSNR/LPIPS, inference time, image counts, and GPU memory statistics.
