@@ -25,9 +25,9 @@ Mitigation: Review and scan skill before deployment. <br>
 - [Wrapper Image Build Guide](references/wrapper-image.md) <br>
 - [Troubleshooting Guide](references/troubleshooting.md) <br>
 - [Teardown and Cleanup Guide](references/teardown.md) <br>
-- [DiffusionHarmonizer Source Code](https://github.com/NVIDIA/harmonizer) <br>
-- [DiffusionHarmonizer Model Card](https://huggingface.co/nvidia/DiffusionHarmonizer) <br>
-- [DiffusionHarmonizer Dataset](https://huggingface.co/datasets/nvidia/DiffusionHarmonizer-Dataset) <br>
+- [Harmonizer Source Code](https://github.com/NVIDIA/harmonizer) <br>
+- [Harmonizer Model Card](https://huggingface.co/nvidia/Harmonizer) <br>
+- [Harmonizer Dataset](https://huggingface.co/datasets/nvidia/Harmonizer-Dataset) <br>
 - [DiffusionHarmonizer Paper (arXiv 2602.24096)](https://arxiv.org/abs/2602.24096) <br>
 - [DiffusionHarmonizer Project Page](https://research.nvidia.com/labs/sil/projects/diffusion-harmonizer/) <br>
 
@@ -52,7 +52,7 @@ Reported benchmark dimensions: <br>
 
 
 ## Skill Version(s): <br>
-0.4.1 (source: frontmatter) <br>
+0.5.0 (source: frontmatter) <br>
 
 ## Ethical Considerations: <br>
 NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications. When downloaded or used in accordance with our terms of service, developers should work with their internal team to ensure this skill meets requirements for the relevant industry and use case and addresses unforeseen product misuse. <br>

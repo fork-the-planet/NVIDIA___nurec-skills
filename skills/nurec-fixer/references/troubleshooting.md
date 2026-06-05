@@ -20,10 +20,11 @@ echo "$NGC_API_KEY" | docker login nvcr.io --username '$oauthtoken' --password-s
 The username must be the literal string `$oauthtoken`. Do not paste the
 key into shell history.
 
-**`hf download nvidia/DiffusionHarmonizer` returns 401 / 403**
+**`./download_checkpoints.sh` returns 401 / 403**
 
-`HF_TOKEN` is missing, expired, lacks read scope, or the model license
-has not been accepted. Visit the model page in a browser, accept the
+`HF_TOKEN` is missing, expired, lacks read scope, or the
+`nvidia/Harmonizer` or `nvidia/Cosmos-Predict2-0.6B-Text2Image` license
+has not been accepted. Visit each model page in a browser, accept the
 license if gated, then run `hf auth login --token "$HF_TOKEN"`.
 
 **`hf: command not found`**
@@ -46,28 +47,38 @@ and `tokenizer.patch` manually only when running the raw base container.
 
 ## Runtime
 
-**`pretrained_harmonizer.pkl` cannot be found**
+**`diffusion_harmonizer.pkl` cannot be found**
 
-The expected model path after download is:
+The expected checkpoint path after download is:
 
 ```text
-models/pretrained/pretrained_harmonizer.pkl
+models/diffusion_harmonizer.pkl
 ```
 
 Run:
 
 ```bash
-hf download nvidia/DiffusionHarmonizer --local-dir models
+./download_checkpoints.sh
 ```
 
-from the code checkout, or adjust `--model` to the actual in-container
-path.
+from the code checkout, or adjust `--model_path` to the actual
+in-container path.
 
-**`No such file or directory: src/inference_pretrained_model_harmonizer.py`**
+**`ModuleNotFoundError` / cannot import sibling modules, or base Cosmos
+model not found**
 
-The fixed README branch standardizes on
-`src/inference_pretrained_model.py`. Some intermediate branch text used
-the `_harmonizer` suffix. Use the script present in your checkout.
+`inference_pix2pix_turbo_harmonizer.py` imports sibling modules from
+`src/` and loads the base model from `src/checkpoints/`. Launch it from
+`/work/src` (`-w /work/src`) and mount the whole checkout at `/work` so
+both `models/` and `src/checkpoints/` are visible — do not mount only
+the frames directory.
+
+**Output frames are not where I expected**
+
+`inference_pix2pix_turbo_harmonizer.py` has no `--output` flag. It
+writes to a sibling folder named `<input_dir>_<model_identifier>` next
+to the input directory. Make sure that parent directory is writable and
+mounted on the host.
 
 **Output files are owned by root**
 
@@ -79,11 +90,13 @@ sudo chown -R "$(id -u):$(id -g)" /absolute/path/to/output
 
 Then rerun with the `-u` flag.
 
-**Frames appear out of temporal order**
+**Frames appear out of temporal order / temporal artifacts**
 
-The standard inference helper sorts paths as strings. Names like
-`frame_10.png` sort before `frame_2.png`. Use fixed-width zero-padded
-names such as `frame_000010.png`.
+`inference_pix2pix_turbo_harmonizer.py` enhances frames in natural-sorted
+order and feeds previous outputs back as temporal references. Use
+fixed-width zero-padded names such as `frame_000010.png` so ordering is
+unambiguous, or pass `--nontemporal` to disable temporal conditioning for
+unordered images.
 
 **CUDA out of memory**
 

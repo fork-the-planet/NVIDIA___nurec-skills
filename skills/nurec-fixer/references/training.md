@@ -11,10 +11,13 @@ curation pipelines. Download the assembled dataset when the user
 wants to train, fine-tune, or reproduce evaluation:
 
 ```bash
-hf download nvidia/DiffusionHarmonizer-Dataset \
+hf download nvidia/Harmonizer-Dataset \
   --repo-type dataset \
   --local-dir data
 ```
+
+The `./download_checkpoints.sh --with-dataset` helper performs the same
+download as part of fetching the inference checkpoints.
 
 Data sources and targeted failure modes:
 
@@ -96,8 +99,11 @@ accelerate launch \
 For fine-tuning from the released checkpoint, add:
 
 ```bash
---pretrained_path /path/to/pretrained_harmonizer.pkl
+--pretrained_path /path/to/diffusion_harmonizer.pkl
 ```
+
+When omitted, the model is fine-tuned directly from the raw Cosmos 0.6B
+image model.
 
 For the released dataset, the README recommends
 `--fixing_data_weight 3` to up-weight artifact-correction

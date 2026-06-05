@@ -7,7 +7,7 @@ description: >-
   reconstructions. Do NOT use for training the 3D reconstruction
   itself (use `nre`) or for sensor-to-NCore conversion (use
   `ncore`).
-version: "0.4.1"
+version: "0.5.0"
 tools:
   - Shell
   - Read
@@ -16,12 +16,14 @@ license: CC-BY-4.0 AND Apache-2.0
 compatibility: >-
   Linux + NVIDIA GPU Ampere+ (compute capability >= 8.0; A100,
   A10, L40, H100, RTX 30/40/PRO, B200, GB200), Docker + NVIDIA
-  Container Toolkit, ~120 GB free disk. HF_TOKEN required for
-  gated `nvidia/DiffusionHarmonizer` model weights; NGC_API_KEY
-  needed when pulling Cosmos Predict2 from nvcr.io. Code at
-  github.com/NVIDIA/harmonizer; runtime uses
-  nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2 or the
-  project Dockerfile that layers required packages and patches.
+  Container Toolkit, ~120 GB free disk. HF_TOKEN required for the
+  `nvidia/Harmonizer` checkpoints and the base
+  `nvidia/Cosmos-Predict2-0.6B-Text2Image` model; NGC_API_KEY
+  needed when pulling the `nvcr.io/nvidia/pytorch:25.10-py3` base
+  image from nvcr.io. Code at github.com/NVIDIA/harmonizer;
+  runtime is the `harmonizer-cosmos-env` image built from the
+  project `Dockerfile.cosmos`, which layers cosmos-predict2 and
+  the required patches on top of `nvcr.io/nvidia/pytorch:25.10-py3`.
 dependencies:
   - bash
   - docker
@@ -41,9 +43,9 @@ metadata:
     - post-processing
     - evaluation
   upstream: https://github.com/NVIDIA/harmonizer
-  hf_model: https://huggingface.co/nvidia/DiffusionHarmonizer
-  hf_dataset: https://huggingface.co/datasets/nvidia/DiffusionHarmonizer-Dataset
-  container: nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2
+  hf_model: https://huggingface.co/nvidia/Harmonizer
+  hf_dataset: https://huggingface.co/datasets/nvidia/Harmonizer-Dataset
+  container: nvcr.io/nvidia/pytorch:25.10-py3
   paper: https://arxiv.org/abs/2602.24096
   product_page: https://research.nvidia.com/labs/sil/projects/diffusion-harmonizer/
   model_license: NVIDIA Open Model License Agreement
@@ -83,16 +85,25 @@ the DiffusionHarmonizer model.
 
 ## What changed from the older Fixer skill
 
-This skill now follows the newer DiffusionHarmonizer release
-branches, not the older NGC JIT `.pt` artifact recipe. Use these
-public release artifacts:
+This skill follows the public `NVIDIA/harmonizer` release, not
+the older NGC JIT `.pt` artifact recipe. Use these public
+release artifacts:
 
 - Code: <https://github.com/NVIDIA/harmonizer>
-- Model: `nvidia/DiffusionHarmonizer` on Hugging Face
-- Main checkpoint: `models/pretrained/pretrained_harmonizer.pkl`
-- Runtime: Cosmos Predict2 environment
-  (`nvcr.io/nvidia/cosmos/cosmos-predict2-container:1.2`)
-- Inference entry: `src/inference_pretrained_model.py`
+- Model: `nvidia/Harmonizer` on Hugging Face (the paper checkpoint
+  `models/diffusion_harmonizer.pkl`), plus the base
+  `nvidia/Cosmos-Predict2-0.6B-Text2Image` model that inference
+  also requires.
+- Checkpoint download: `./download_checkpoints.sh` from the repo
+  root. It fetches the Harmonizer checkpoints into `models/`
+  (`diffusion_harmonizer.pkl`, `harmonizer_nontemporal.pt`) and
+  the base Cosmos DiT + tokenizer into
+  `src/checkpoints/nvidia/Cosmos-Predict2-0.6B-Text2Image/`.
+- Runtime: the `harmonizer-cosmos-env` image built from
+  `Dockerfile.cosmos` (base `nvcr.io/nvidia/pytorch:25.10-py3`).
+- Inference entry: `src/inference_pix2pix_turbo_harmonizer.py`,
+  run from inside `/work/src` so it can import its sibling
+  modules.
 - Evaluation entry: `src/evaluate_test_dataset.py`
 - Training entry: `src/train_pix2pix_turbo_harmonizer.py`
 
@@ -100,7 +111,10 @@ Do not use the obsolete standalone recipe that downloads
 `nvidia/nre/nurec-fixer:cosmos_3dgut_fixer_harmonizer`, mounts
 `harmonizer_temporal.pt`, or runs `inference_jit_harmonizer.py`
 inside `nvcr.io/nvidia/pytorch:24.10-py3` unless the user
-explicitly asks for that older beta artifact.
+explicitly asks for that older beta artifact. Do not run
+`inference_pretrained_model.py`; the current README documents
+`inference_pix2pix_turbo_harmonizer.py` as the inference entry
+point.
 
 ## Background
 
@@ -130,16 +144,20 @@ a Cosmos Predict2 Diffusion Transformer post-trained at
 
 - **code_dir** — checkout of
   <https://github.com/NVIDIA/harmonizer>.
-- **model_dir** — directory downloaded from Hugging Face. After
-  `hf download nvidia/DiffusionHarmonizer --local-dir models`,
-  the main checkpoint is
-  `models/pretrained/pretrained_harmonizer.pkl`.
+- **model_dir** — checkpoints fetched by `./download_checkpoints.sh`
+  from the repo root. It places the paper checkpoint at
+  `models/diffusion_harmonizer.pkl` and the required base Cosmos
+  model under
+  `src/checkpoints/nvidia/Cosmos-Predict2-0.6B-Text2Image/`.
 - **input_dir** — directory of rendered RGB frames (`.png`,
   `.jpg`, `.jpeg`) to enhance.
-- **output_dir** — directory where enhanced frames are written.
-- **HF_TOKEN** — Hugging Face token with access to the model
-  and, if used, the dataset. Accept the model/dataset license
-  terms first.
+- **output_dir** — `inference_pix2pix_turbo_harmonizer.py` does
+  not take an output flag; it writes to a sibling folder named
+  `<input_dir>_<model_identifier>` next to the input directory.
+- **HF_TOKEN** — Hugging Face token with access to
+  `nvidia/Harmonizer`, `nvidia/Cosmos-Predict2-0.6B-Text2Image`,
+  and (if used) `nvidia/Harmonizer-Dataset`. Accept the
+  model/dataset license terms first.
 - **NGC_API_KEY** — often needed to authenticate `docker pull`
   from `nvcr.io`. Use only for container pulls, not model
   download.
@@ -163,23 +181,30 @@ a Cosmos Predict2 Diffusion Transformer post-trained at
    docker build -t harmonizer-cosmos-env -f Dockerfile.cosmos .
    ```
 
-3. **Download the pretrained model.**
+3. **Download the checkpoints.** From the repo root run the
+   helper, which fetches both the Harmonizer checkpoints and the
+   base Cosmos model into the paths the code expects.
 
    ```bash
    export HF_TOKEN=<your-hugging-face-token>
    hf auth login --token "$HF_TOKEN"
-   hf download nvidia/DiffusionHarmonizer --local-dir models
+   ./download_checkpoints.sh
    ```
 
-   Verify `models/pretrained/pretrained_harmonizer.pkl` exists.
+   Verify `models/diffusion_harmonizer.pkl` and
+   `src/checkpoints/nvidia/Cosmos-Predict2-0.6B-Text2Image/`
+   exist.
 4. **Confirm `input_dir` exists and filenames sort into frame
-   order.** The current public inference script uses normal
-   string sorting; prefer zero-padded names such as
-   `frame_000001.png`.
-5. **Run inference inside the container** with input, output,
-   and model paths mounted. Pin `-u $(id -u):$(id -g)` so
-   outputs are owned by the host user. Full `docker run` recipe
-   and flag matrix in
+   order.** The temporal inference script sorts frames with
+   natural sort and uses previous outputs as references; prefer
+   zero-padded names such as `frame_000001.png`.
+5. **Run inference inside the container** with the repo mounted
+   at `/work`, then `cd /work/src` and run
+   `inference_pix2pix_turbo_harmonizer.py`. Pin
+   `-u $(id -u):$(id -g)` so outputs are owned by the host user.
+   Output frames land in
+   `<input_dir>_<model_identifier>`. Full `docker run` recipe and
+   flag matrix in
    [`references/inference.md`](references/inference.md).
 6. **Validate that the output frame count matches the input
    frame count,** spot-check frames, and (if ground truth is
@@ -188,7 +213,10 @@ a Cosmos Predict2 Diffusion Transformer post-trained at
 7. **(Optional) Train or fine-tune.** Download the dataset (or
    prepare JSON manifests in the documented format), then run
    `src/train_pix2pix_turbo_harmonizer.py` with the recommended
-   hyperparameters. Full recipe + NuRec data-pair recipes in
+   hyperparameters. For fine-tuning, initialize from the released
+   checkpoint with `--pretrained_path
+   /path/to/diffusion_harmonizer.pkl`. Full recipe + NuRec
+   data-pair recipes in
    [`references/training.md`](references/training.md).
 8. **(Optional) Teardown.** Follow
    [`references/teardown.md`](references/teardown.md) to remove
@@ -200,11 +228,14 @@ a Cosmos Predict2 Diffusion Transformer post-trained at
 
 Run `scripts/validate_setup.py`, build the image once (see
 [`references/wrapper-image.md`](references/wrapper-image.md)), then
-invoke `inference_pretrained_model.py` inside the `harmonizer-cosmos-env`
-container with `$CODE_DIR` mounted at `/work`, the rendered frames at
-`/input:ro`, and the output directory at `/output` — typical flags
-are `--timestep 250 --resolution 1024`. The canonical `docker run`
-command and the full flag matrix live in
+invoke `inference_pix2pix_turbo_harmonizer.py` inside the
+`harmonizer-cosmos-env` container with the repo checkout mounted at
+`/work`. From `/work/src`, point `--input_image` at the rendered
+frames, `--model_path` at `/work/models/diffusion_harmonizer.pkl`,
+set `--model_identifier`, and pass typical flags
+`--timestep 250 --resolution 1024 --use_sched`. Enhanced frames are
+written to `<input_dir>_<model_identifier>`. The canonical
+`docker run` command and the full flag matrix live in
 [`references/inference.md`](references/inference.md).
 
 ### Example 2 — Quantitative PSNR / LPIPS evaluation
@@ -217,20 +248,22 @@ exact directory shape and the `docker run` command.
 
 ### Example 3 — Fine-tune from the public checkpoint
 
-Download `nvidia/DiffusionHarmonizer-Dataset`, prepare the
+Download `nvidia/Harmonizer-Dataset`, prepare the
 training JSON, then run
 `src/train_pix2pix_turbo_harmonizer.py` with the multi-GPU
 `accelerate launch` recipe in
 [`references/training.md`](references/training.md). For
 fine-tuning add `--pretrained_path
-/path/to/pretrained_harmonizer.pkl` and use
+/path/to/diffusion_harmonizer.pkl` and use
 `--fixing_data_weight 3` on the released dataset.
 
-### Example 4 — Temporal-aware enhancement
+### Example 4 — Non-temporal (frame-by-frame) enhancement
 
-Use `src/inference_pix2pix_turbo_harmonizer.py` when the user
-explicitly asks for temporal conditioning rather than the
-standard pretrained model script. Full command +
+`inference_pix2pix_turbo_harmonizer.py` is temporal by default
+and uses previous enhanced frames as references
+(`--offset_list -1 -2 -3 -4`). When the user wants each frame
+enhanced independently (e.g. unordered images), add
+`--nontemporal` to disable temporal conditioning. Full command +
 `--offset_list` defaults in
 [`references/inference.md`](references/inference.md).
 
@@ -261,18 +294,22 @@ disk.
   `huggingface-cli`).
 - **Secrets:**
   - `HF_TOKEN` with the
-    [`nvidia/DiffusionHarmonizer`](https://huggingface.co/nvidia/DiffusionHarmonizer)
-    license accepted (required to download model weights and
+    [`nvidia/Harmonizer`](https://huggingface.co/nvidia/Harmonizer)
+    and
+    [`nvidia/Cosmos-Predict2-0.6B-Text2Image`](https://huggingface.co/nvidia/Cosmos-Predict2-0.6B-Text2Image)
+    licenses accepted (required to download model weights and
     the optional dataset).
   - `NGC_API_KEY` (often required for `docker login nvcr.io`
-    before pulling `nvcr.io/nvidia/cosmos/...`).
-- **Disk:** at least ~120 GB free for the Cosmos image, build
+    before pulling `nvcr.io/nvidia/pytorch:25.10-py3`).
+- **Disk:** at least ~120 GB free for the runtime image, build
   cache, model weights, optional dataset, and outputs combined.
 - **Source / model / dataset:**
   - Code: <https://github.com/NVIDIA/harmonizer>.
-  - Model: <https://huggingface.co/nvidia/DiffusionHarmonizer>.
+  - Model: <https://huggingface.co/nvidia/Harmonizer>.
+  - Base model:
+    <https://huggingface.co/nvidia/Cosmos-Predict2-0.6B-Text2Image>.
   - Optional dataset:
-    <https://huggingface.co/datasets/nvidia/DiffusionHarmonizer-Dataset>.
+    <https://huggingface.co/datasets/nvidia/Harmonizer-Dataset>.
 
 The fail-fast check that enforces all of the above is
 `scripts/validate_setup.py`.
@@ -287,8 +324,9 @@ The fail-fast check that enforces all of the above is
 ## References
 
 - [`references/inference.md`](references/inference.md) — container
-  build, raw-Cosmos fallback, Blackwell patches, model download,
-  `inference_pretrained_model.py` flag matrix, temporal variant.
+  build, raw-base fallback, Blackwell patches, checkpoint
+  download, `inference_pix2pix_turbo_harmonizer.py` flag matrix,
+  non-temporal mode.
 - [`references/evaluation.md`](references/evaluation.md) — paired
   `test_dataset/` layout and `evaluate_test_dataset.py` command.
 - [`references/training.md`](references/training.md) — dataset
@@ -302,8 +340,8 @@ The fail-fast check that enforces all of the above is
   inventory for images, code, Hugging Face caches, datasets,
   and outputs.
 - Public code: <https://github.com/NVIDIA/harmonizer>
-- Model card: <https://huggingface.co/nvidia/DiffusionHarmonizer>
-- Dataset: <https://huggingface.co/datasets/nvidia/DiffusionHarmonizer-Dataset>
+- Model card: <https://huggingface.co/nvidia/Harmonizer>
+- Dataset: <https://huggingface.co/datasets/nvidia/Harmonizer-Dataset>
 - Paper: <https://arxiv.org/abs/2602.24096>
 - Project page: <https://research.nvidia.com/labs/sil/projects/diffusion-harmonizer/>
 
@@ -312,21 +350,23 @@ The fail-fast check that enforces all of the above is
 - **Rendered inputs only.** The model is tuned for
   neural-reconstruction renderings and object-insertion
   artifacts, not arbitrary real photos.
-- **Primary model resolution is 576x1024.** The public script
-  maps resolution key `1024` to `1024x576` and restores outputs
-  to the original image size. Other keys are script-supported
-  but may not match the model-card operating point.
-- **Filename ordering matters.** The standard inference script
-  sorts filenames as strings. Use zero-padded frame numbers.
-- **Container builds can be large.** The Cosmos environment,
-  build cache, model weights, and optional dataset can exceed
-  100 GB.
+- **Primary model resolution is 576x1024.** The inference script
+  maps resolution key `1024` to `1024x576`. Only `1024`, `960`,
+  and `1360` are supported keys; `1024` matches the model-card
+  operating point.
+- **Temporal references and filename order matter.** The
+  inference script enhances frames in natural-sorted order and
+  feeds previous outputs back as temporal references. Use
+  zero-padded frame numbers, or pass `--nontemporal` for
+  unordered images.
+- **Container builds can be large.** The runtime image, build
+  cache, model weights, and optional dataset can exceed 100 GB.
 - **Training is multi-GPU by default.** The README command
   assumes 8 GPUs with bf16 mixed precision.
-- **Public code evolves.** If a checkout uses the older
-  `inference_pretrained_model_harmonizer.py` name, prefer the
-  script present in that checkout; the fixed release branch
-  standardises on `inference_pretrained_model.py`.
+- **Public code evolves.** The current README documents
+  `inference_pix2pix_turbo_harmonizer.py` as the inference entry
+  point; if a future checkout renames it, prefer the script and
+  flags present in that checkout.
 
 ## Troubleshooting (top 5)
 
@@ -335,7 +375,7 @@ The fail-fast check that enforces all of the above is
 | `docker: could not select device driver ... gpu` | NVIDIA Container Toolkit missing or Docker is not configured for the NVIDIA runtime. |
 | `docker pull` 401 / 403 from `nvcr.io` | Docker is not authenticated to NGC, or the API key lacks container access. |
 | `hf download ... 401 / 403` | `HF_TOKEN` is missing/expired/lacks read scope, or the model/dataset license has not been accepted. |
-| `pretrained_harmonizer.pkl` missing | Model download path is wrong or incomplete. Re-run `hf download nvidia/DiffusionHarmonizer --local-dir models`. |
+| `diffusion_harmonizer.pkl` missing | Checkpoint download path is wrong or incomplete. Re-run `./download_checkpoints.sh` from the repo root. |
 | Output files owned by `root` | The `docker run` omitted `-u $(id -u):$(id -g)`. |
 
 Full matrix in
