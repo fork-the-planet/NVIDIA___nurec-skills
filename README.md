@@ -160,8 +160,8 @@ Each skill is thin; the canonical artifacts live upstream:
 - **NCore** — <https://github.com/NVIDIA/ncore>
   (spec: <https://nvidia.github.io/ncore/data/conventions.html>)
 - **NRE / NuRec containers** — `nvcr.io/nvidia/nre/nre`,
-  `nvcr.io/nvidia/nre/nre-tools` (NGC); product page
-  <https://www.nvidia.com/en-us/omniverse/nurec/>
+  `nvcr.io/nvidia/nre/nre-tools` (NGC); official documentation page
+  <https://docs.nvidia.com/nurec/>
 - **Asset Harvester** — <https://github.com/NVIDIA/asset-harvester>
   (paper: <https://arxiv.org/abs/2604.18468>; demo:
   <https://huggingface.co/spaces/nvidia/asset-harvester>)
