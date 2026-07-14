@@ -8,6 +8,19 @@ artifacts, and find the right NVIDIA dataset for the job.
 
 The canonical home is <https://github.com/NVIDIA/nurec-skills>.
 
+## Support
+
+**Usage questions and discussion:** please post on the
+[NVIDIA Developer Forum (Omniverse / NuRec)](https://forums.developer.nvidia.com/c/omniverse/platform/nurec/752).
+
+**Code-level bugs, documentation issues, and feature requests:** file a
+[GitHub issue](../../issues/new/choose) using the appropriate template. The
+relevant NVIDIA responder is assigned automatically.
+
+**Security vulnerabilities:** use
+[NVIDIA's Vulnerability Disclosure Program](https://app.intigriti.com/programs/nvidia/nvidiavdp/detail).
+Do not file security issues publicly in this repository.
+
 ## What's a skill?
 
 A **skill** is a single Markdown file (plus a few companion files)
@@ -178,8 +191,10 @@ skill's `references/` and `scripts/` folders and bump the
 
 ## Contributing
 
-This project is currently not accepting contributions. Issues or pull
-requests from external contributors will not be accepted.
+This project is not currently accepting external pull requests. Code-level
+bugs, documentation issues, and feature requests are welcome through the
+[issue templates](../../issues/new/choose). For usage questions and security
+reports, use the channels listed in [Support](#support).
 
 - Frontmatter follows the [agentskills.io](https://agentskills.io)
   schema (`name`, `description`, `version`, `license`, `metadata`).

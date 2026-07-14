@@ -2,22 +2,20 @@
 
 NVIDIA is dedicated to the security and trust of our software products and services, including all source code repositories managed through our organization.
 
-If you need to report a security issue, please use the appropriate contact points outlined below. **Please do not report security vulnerabilities through GitHub.**
+If you need to report a security issue, use NVIDIA's Vulnerability Disclosure
+Program. **Please do not report security vulnerabilities through GitHub.**
 
 ## Reporting Potential Security Vulnerability in an NVIDIA Product
 
-To report a potential security vulnerability in any NVIDIA product:
-- Web: [Security Vulnerability Submission Form](https://www.nvidia.com/object/submit-security-vulnerability.html)
-- E-Mail: psirt@nvidia.com
-    - We encourage you to use the following PGP key for secure email communication: [NVIDIA public PGP Key for communication](https://www.nvidia.com/en-us/security/pgp-key)
-    - Please include the following information:
-   	 - Product/Driver name and version/branch that contains the vulnerability
-     - Type of vulnerability (code execution, denial of service, buffer overflow, etc.)
-   	 - Instructions to reproduce the vulnerability
-   	 - Proof-of-concept or exploit code
-   	 - Potential impact of the vulnerability, including how an attacker could exploit the vulnerability
+Submit potential security vulnerabilities through
+[NVIDIA's Vulnerability Disclosure Program](https://app.intigriti.com/programs/nvidia/nvidiavdp/detail).
+Include the affected product and version or branch, the vulnerability type,
+reproduction instructions, proof-of-concept material when available, and the
+potential impact.
 
-While NVIDIA currently does not have a bug bounty program, we do offer acknowledgement when an externally reported security issue is addressed under our coordinated vulnerability disclosure policy. Please visit our [Product Security Incident Response Team (PSIRT)](https://www.nvidia.com/en-us/security/psirt-policies/) policies page for more information.
+See NVIDIA's
+[Product Security Incident Response Team policies](https://www.nvidia.com/en-us/security/psirt-policies/)
+for coordinated disclosure information.
 
 ## NVIDIA Product Security
 
